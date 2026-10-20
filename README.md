@@ -22,9 +22,10 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
   - Saturdays/Sundays and Japanese national holidays are displayed as **休日 / 祝日**.
   - No leader is assigned on weekends or holidays.
   - Rotation freezes over the weekend and resumes Monday.
-- Persistent base leader with cascading fallback:
-  - The base pointer remains fixed while the base leader is unavailable.
-  - When a base leader serves, the pointer advances.
+- Round-robin ring rotation:
+  - The base index advances by one for every valid school weekday.
+  - Saturdays, Sundays, and Japanese holidays are skipped.
+  - Same-day fallback searches forward through the ring without changing tomorrow's base index.
   - Cascades skip absent/official-absence students and the previous weekday's active leader.
 - Initial class state (when Firestore is first initialized on a weekday):
   - Base: 鈴木 斗和 — 欠席

@@ -613,16 +613,32 @@
       return null;
     }
 
-    // Persistent-base simulation over weekdays only:
-    // - Saturday/Sunday have no leader and freeze the rotation pointer.
-    // - The base pointer advances only after the base student serves.
-    // - If the base is absent, the pointer stays for the next weekday.
-    // - Cascading fallback skips the previous weekday's active leader.
-    function buildDutyForDay(dateKey, pointer, previousActiveCode) {
+    // Round-robin ring: every valid school weekday advances the base index.
+    function countSchoolDaysBetween(fromDate, toDate) {
+      if (toDate <= fromDate) return 0;
+      let count = 0;
+      let cursor = fromDate;
+      let guard = 0;
+      while (cursor < toDate && guard < 2000) {
+        cursor = addDays(cursor, 1);
+        if (!isOffDay(cursor)) count += 1;
+        guard += 1;
+      }
+      return count;
+    }
+
+    function baseIndexForDate(dateKey) {
+      const elapsed = countSchoolDaysBetween(ROTATION_ANCHOR.date, dateKey);
+      return ((ROTATION_ANCHOR.index + elapsed) % ROSTER.length + ROSTER.length) % ROSTER.length;
+    }
+
+    function buildDutyForDay(dateKey) {
       const offDay = offDayDuty(dateKey);
       if (offDay) return offDay;
+
       const map = getStatusMap(dateKey);
-      const base = ROSTER[pointer];
+      const baseIndex = baseIndexForDate(dateKey);
+      const base = ROSTER[baseIndex];
       const absentCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'absent').map((s) => s.code));
       const officialCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'official').map((s) => s.code));
       const unavailableCodes = new Set([...absentCodes, ...officialCodes]);
@@ -637,10 +653,10 @@
       } else {
         shifted = true;
         reason = normalizeStatusEntry(map[base.code]).type === 'official' ? 'official' : 'absent';
+        // Same-day fallback only. It never changes tomorrow's scheduled base.
         for (let step = 1; step < ROSTER.length; step += 1) {
-          const candidate = ROSTER[(pointer + step) % ROSTER.length];
+          const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
           if (unavailableCodes.has(candidate.code)) continue;
-          if (previousActiveCode && candidate.code === previousActiveCode) continue;
           effective = candidate;
           steps = step;
           break;
@@ -649,6 +665,7 @@
 
       return {
         date: dateKey,
+        baseIndex,
         designated: base,
         effective,
         shifted,
@@ -667,24 +684,10 @@
       dutyCache = {};
       const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
       const endDate = addDays(TODAY, MAX_PLAN_DAYS);
-      let pointer = ROTATION_ANCHOR.index;
-      let previousActiveCode = null;
       let cursor = startDate;
       let guard = 0;
-
       while (cursor <= endDate && guard < 800) {
-        const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
-        dutyCache[cursor] = duty;
-        if (!duty.isOffDay) {
-          if (duty.effective) {
-            if (duty.effective.code === duty.designated.code) {
-              pointer = (pointer + 1) % ROSTER.length;
-            }
-            previousActiveCode = duty.effective.code;
-          } else {
-            previousActiveCode = null;
-          }
-        }
+        dutyCache[cursor] = buildDutyForDay(cursor);
         cursor = addDays(cursor, 1);
         guard += 1;
       }
@@ -692,34 +695,13 @@
 
     function computeDuty(dateKey) {
       if (dutyCache[dateKey]) return dutyCache[dateKey];
-      // On-demand simulation for a date outside the cached window.
-      const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
-      let pointer = ROTATION_ANCHOR.index;
-      let previousActiveCode = null;
-      let cursor = startDate;
-      let guard = 0;
-      while (cursor <= dateKey && guard < 800) {
-        const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
-        dutyCache[cursor] = duty;
-        if (!duty.isOffDay) {
-          if (duty.effective) {
-            if (duty.effective.code === duty.designated.code) {
-              pointer = (pointer + 1) % ROSTER.length;
-            }
-            previousActiveCode = duty.effective.code;
-          } else {
-            previousActiveCode = null;
-          }
-        }
-        cursor = addDays(cursor, 1);
-        guard += 1;
-      }
-      return dutyCache[dateKey] || offDayDuty(dateKey) || buildDutyForDay(dateKey, ROTATION_ANCHOR.index, null);
+      const duty = buildDutyForDay(dateKey);
+      dutyCache[dateKey] = duty;
+      return duty;
     }
 
     function designatedIndex(dateKey) {
-      const designated = computeDuty(dateKey).designated;
-      return designated ? ROSTER.findIndex((s) => s.code === designated.code) : -1;
+      return baseIndexForDate(dateKey);
     }
 
     function timeToMinutes(time) {
@@ -744,17 +726,6 @@
       return true;
     }
 
-    function previousWeekdayActiveCode(dateKey) {
-      let cursor = addDays(dateKey, -1);
-      let guard = 0;
-      while (isOffDay(cursor) && guard < 10) {
-        cursor = addDays(cursor, -1);
-        guard += 1;
-      }
-      const duty = computeDuty(cursor);
-      return duty.effective ? duty.effective.code : null;
-    }
-
     function computeLiveDuty(dateKey, period) {
       const offDay = offDayDuty(dateKey);
       if (offDay) return offDay;
@@ -762,7 +733,6 @@
       const base = daily.designated;
       const baseIndex = ROSTER.findIndex((s) => s.code === base.code);
       const map = getStatusMap(dateKey);
-      const previousActiveCode = previousWeekdayActiveCode(dateKey);
       const baseEntry = normalizeStatusEntry(map[base.code]);
 
       let effective = null;
@@ -779,7 +749,6 @@
           const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
           const entry = normalizeStatusEntry(map[candidate.code]);
           if (!statusAvailableAtPeriod(entry, period)) continue;
-          if (previousActiveCode && candidate.code === previousActiveCode) continue;
           effective = candidate;
           steps = step;
           break;
