@@ -22,10 +22,12 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
   - Saturdays/Sundays and Japanese national holidays are displayed as **休日 / 祝日**.
   - No leader is assigned on weekends or holidays.
   - Rotation freezes over the weekend and resumes Monday.
-- Round-robin ring rotation:
-  - The base index advances by one for every valid school weekday.
-  - Saturdays, Sundays, and Japanese holidays are skipped.
-  - Same-day fallback searches forward through the ring without changing tomorrow's base index.
+- Dynamic active-pool rotation:
+  - Only students who are present/unregistered (or time-available) are eligible.
+  - Absent and official-absence students are excluded for that day.
+  - The previous school day's leader is always bypassed to prevent consecutive duty.
+  - Returning students get first priority on their first day back.
+  - The cursor advances to the next active student after each assignment.
   - Cascades skip absent/official-absence students and the previous weekday's active leader.
 - Initial class state (when Firestore is first initialized on a weekday):
   - Base: 鈴木 斗和 — 欠席
@@ -81,7 +83,6 @@ For production, tighten the rules further to verify the exact 10 whitelisted ema
 
 - `config/rotation` — rotation anchor date and initial index.
 - `statuses/{YYYY-MM-DD}` — map of student code → `present | absent | official`.
-- `alerts/{autoId}` — class-wide status/fallback notifications.
 
 ## Notifications
 

@@ -614,64 +614,103 @@
       return null;
     }
 
-    // Round-robin ring: every valid school weekday advances the base index.
-    function countSchoolDaysBetween(fromDate, toDate) {
-      if (toDate <= fromDate) return 0;
-      let count = 0;
-      let cursor = fromDate;
-      let guard = 0;
-      while (cursor < toDate && guard < 2000) {
-        cursor = addDays(cursor, 1);
-        if (!isOffDay(cursor)) count += 1;
-        guard += 1;
-      }
-      return count;
+    function entryIsUnavailable(entry) {
+      return entry.type === 'absent' || entry.type === 'official';
     }
 
-    function baseIndexForDate(dateKey) {
-      const elapsed = countSchoolDaysBetween(ROTATION_ANCHOR.date, dateKey);
-      return ((ROTATION_ANCHOR.index + elapsed) % ROSTER.length + ROSTER.length) % ROSTER.length;
-    }
-
-    function buildDutyForDay(dateKey) {
+    // Dynamic active pool:
+    // - Only available students (present/unregistered/late/early) are eligible.
+    // - Previous valid school day's leader is always bypassed.
+    // - A student returning after an absence gets first priority.
+    // - Late/early availability is additionally handled by the live time-aware layer.
+    function selectDutyForDate(dateKey, cursorIndex, previousLeaderCode, previousStatusMap) {
       const offDay = offDayDuty(dateKey);
-      if (offDay) return offDay;
+      if (offDay) return { ...offDay, cursorIndex, previousLeaderCode, returningCodes: [] };
 
       const map = getStatusMap(dateKey);
-      const baseIndex = baseIndexForDate(dateKey);
-      const base = ROSTER[baseIndex];
-      const absentCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'absent').map((s) => s.code));
-      const officialCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'official').map((s) => s.code));
+      const entries = {};
+      ROSTER.forEach((student) => { entries[student.code] = normalizeStatusEntry(map[student.code]); });
+      const absentCodes = new Set(ROSTER.filter((s) => entries[s.code].type === 'absent').map((s) => s.code));
+      const officialCodes = new Set(ROSTER.filter((s) => entries[s.code].type === 'official').map((s) => s.code));
       const unavailableCodes = new Set([...absentCodes, ...officialCodes]);
+      const returningCodes = new Set();
+      if (previousStatusMap) {
+        ROSTER.forEach((student) => {
+          const previous = normalizeStatusEntry(previousStatusMap[student.code]);
+          const wasUnavailable = previous.type === 'absent' || previous.type === 'official';
+          const isAvailableNow = !unavailableCodes.has(student.code);
+          if (wasUnavailable && isAvailableNow) returningCodes.add(student.code);
+        });
+      }
+
+      // Return-day priority: first returning student in circular order from the cursor.
+      let returning = null;
+      for (let step = 0; step < ROSTER.length; step += 1) {
+        const candidate = ROSTER[(cursorIndex + step) % ROSTER.length];
+        if (candidate.code === previousLeaderCode) continue;
+        if (returningCodes.has(candidate.code)) { returning = candidate; break; }
+      }
+
+      if (returning) {
+        return {
+          date: dateKey,
+          cursorIndex,
+          baseIndex: cursorIndex,
+          previousLeaderCode,
+          designated: returning,
+          effective: returning,
+          shifted: false,
+          steps: 0,
+          reason: null,
+          returning: true,
+          returningCodes: [...returningCodes],
+          absentCodes,
+          officialCodes,
+          unavailableCodes,
+          absents: ROSTER.filter((s) => absentCodes.has(s.code)),
+          officials: ROSTER.filter((s) => officialCodes.has(s.code)),
+          unavailable: ROSTER.filter((s) => unavailableCodes.has(s.code))
+        };
+      }
 
       let effective = null;
-      let shifted = false;
       let steps = 0;
-      let reason = null;
+      let firstUnavailable = null;
+      let firstUnavailableEntry = null;
 
-      if (!unavailableCodes.has(base.code)) {
-        effective = base;
-      } else {
-        shifted = true;
-        reason = normalizeStatusEntry(map[base.code]).type === 'official' ? 'official' : 'absent';
-        // Same-day fallback only. It never changes tomorrow's scheduled base.
-        for (let step = 1; step < ROSTER.length; step += 1) {
-          const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
-          if (unavailableCodes.has(candidate.code)) continue;
-          effective = candidate;
-          steps = step;
-          break;
+      for (let step = 0; step < ROSTER.length; step += 1) {
+        const candidate = ROSTER[(cursorIndex + step) % ROSTER.length];
+        if (candidate.code === previousLeaderCode) continue;
+        const entry = entries[candidate.code];
+        if (entryIsUnavailable(entry)) {
+          if (!firstUnavailable) {
+            firstUnavailable = candidate;
+            firstUnavailableEntry = entry;
+          }
+          continue;
         }
+        effective = candidate;
+        steps = step;
+        break;
       }
+
+      const shifted = Boolean(effective && firstUnavailable);
+      const designated = firstUnavailable || effective || ROSTER[cursorIndex];
 
       return {
         date: dateKey,
-        baseIndex,
-        designated: base,
+        cursorIndex,
+        baseIndex: cursorIndex,
+        previousLeaderCode,
+        designated,
         effective,
         shifted,
         steps,
-        reason,
+        reason: shifted && firstUnavailableEntry
+          ? (firstUnavailableEntry.type === 'official' ? 'official' : firstUnavailableEntry.type)
+          : null,
+        returning: false,
+        returningCodes: [...returningCodes],
         absentCodes,
         officialCodes,
         unavailableCodes,
@@ -681,28 +720,50 @@
       };
     }
 
-    function rebuildDutyCache() {
+    function simulateDutyRange(endDate) {
       dutyCache = {};
       const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
-      const endDate = addDays(TODAY, MAX_PLAN_DAYS);
+      let cursorIndex = ROTATION_ANCHOR.index;
+      let previousLeaderCode = null;
+      let previousStatusMap = null;
       let cursor = startDate;
       let guard = 0;
-      while (cursor <= endDate && guard < 800) {
-        dutyCache[cursor] = buildDutyForDay(cursor);
+
+      while (cursor <= endDate && guard < 2000) {
+        const duty = selectDutyForDate(cursor, cursorIndex, previousLeaderCode, previousStatusMap);
+        dutyCache[cursor] = duty;
+        if (!duty.isOffDay) {
+          if (duty.effective) {
+            cursorIndex = (ROSTER.findIndex((s) => s.code === duty.effective.code) + 1) % ROSTER.length;
+            previousLeaderCode = duty.effective.code;
+          } else {
+            previousLeaderCode = null;
+          }
+          previousStatusMap = getStatusMap(cursor);
+        }
         cursor = addDays(cursor, 1);
         guard += 1;
       }
     }
 
+    function rebuildDutyCache() {
+      simulateDutyRange(addDays(TODAY, MAX_PLAN_DAYS));
+    }
+
     function computeDuty(dateKey) {
       if (dutyCache[dateKey]) return dutyCache[dateKey];
-      const duty = buildDutyForDay(dateKey);
-      dutyCache[dateKey] = duty;
-      return duty;
+      const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
+      if (dateKey < startDate) {
+        return selectDutyForDate(dateKey, ROTATION_ANCHOR.index, null, null);
+      }
+      simulateDutyRange(dateKey > addDays(TODAY, MAX_PLAN_DAYS) ? dateKey : addDays(TODAY, MAX_PLAN_DAYS));
+      return dutyCache[dateKey] || offDayDuty(dateKey) || selectDutyForDate(dateKey, ROTATION_ANCHOR.index, null, null);
     }
 
     function designatedIndex(dateKey) {
-      return baseIndexForDate(dateKey);
+      const duty = computeDuty(dateKey);
+      const target = duty.effective || duty.designated;
+      return target ? ROSTER.findIndex((s) => s.code === target.code) : -1;
     }
 
     function timeToMinutes(time) {
@@ -735,19 +796,21 @@
       const baseIndex = ROSTER.findIndex((s) => s.code === base.code);
       const map = getStatusMap(dateKey);
       const baseEntry = normalizeStatusEntry(map[base.code]);
+      const previousLeaderCode = daily.previousLeaderCode;
 
       let effective = null;
       let shifted = false;
       let steps = 0;
       let reason = null;
 
-      if (statusAvailableAtPeriod(baseEntry, period)) {
+      if (statusAvailableAtPeriod(baseEntry, period) && base.code !== previousLeaderCode) {
         effective = base;
       } else {
         shifted = true;
-        reason = baseEntry.type;
+        reason = entryIsUnavailable(baseEntry) ? baseEntry.type : null;
         for (let step = 1; step < ROSTER.length; step += 1) {
           const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
+          if (candidate.code === previousLeaderCode) continue;
           const entry = normalizeStatusEntry(map[candidate.code]);
           if (!statusAvailableAtPeriod(entry, period)) continue;
           effective = candidate;
