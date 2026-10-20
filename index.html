@@ -618,11 +618,13 @@
       return entry.type === 'absent' || entry.type === 'official';
     }
 
-    // Cumulative round-robin pointer:
-    // - Each school day starts at the student immediately after the last assigned leader.
-    // - Absent/official-absence students are skipped for that day.
-    // - Any assigned leader consumes the turn; the next day continues after them.
-    function selectDutyForDate(dateKey, turnIndex) {
+    // Fair queue rotation:
+    // - All students sit in an ordered queue. Each school day the leader is the FIRST AVAILABLE student in the queue.
+    // - Absent/official-absence students are skipped but KEEP their place at the front of the queue,
+    //   so they lead automatically on the day they come back.
+    // - The student who leads moves to the BACK of the queue.
+    // `order` is the queue as an array of ROSTER indexes (front first).
+    function selectDutyForDate(dateKey, turnIndex, order) {
       const offDay = offDayDuty(dateKey);
       if (offDay) return { ...offDay, turnIndex, baseIndex: turnIndex };
 
@@ -633,13 +635,17 @@
       const officialCodes = new Set(ROSTER.filter((s) => entries[s.code].type === 'official').map((s) => s.code));
       const unavailableCodes = new Set([...absentCodes, ...officialCodes]);
 
+      const queueOrder = Array.isArray(order) && order.length === ROSTER.length
+        ? order.slice()
+        : ROSTER.map((_, i) => (turnIndex + i) % ROSTER.length);
+
       let effective = null;
       let steps = 0;
       let firstUnavailable = null;
       let firstUnavailableEntry = null;
 
       for (let step = 0; step < ROSTER.length; step += 1) {
-        const candidate = ROSTER[(turnIndex + step) % ROSTER.length];
+        const candidate = ROSTER[queueOrder[step]];
         const entry = entries[candidate.code];
         if (entryIsUnavailable(entry)) {
           if (!firstUnavailable) {
@@ -654,12 +660,13 @@
       }
 
       const shifted = Boolean(effective && firstUnavailable);
-      const designated = firstUnavailable || effective || ROSTER[turnIndex];
+      const designated = firstUnavailable || effective || ROSTER[queueOrder[0]];
 
       return {
         date: dateKey,
         turnIndex,
         baseIndex: turnIndex,
+        order: queueOrder,
         designated,
         effective,
         shifted,
@@ -679,16 +686,19 @@
     function simulateDutyRange(endDate) {
       dutyCache = {};
       const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
-      let lastAssignedIndex = (ROTATION_ANCHOR.index - 1 + ROSTER.length) % ROSTER.length;
+      // Queue starts with the anchor student at the front.
+      let queue = ROSTER.map((_, i) => (ROTATION_ANCHOR.index + i) % ROSTER.length);
       let cursor = startDate;
       let guard = 0;
 
       while (cursor <= endDate && guard < 2000) {
-        const turnIndex = (lastAssignedIndex + 1) % ROSTER.length;
-        const duty = selectDutyForDate(cursor, turnIndex);
+        const duty = selectDutyForDate(cursor, queue[0], queue);
         dutyCache[cursor] = duty;
         if (!duty.isOffDay && duty.effective) {
-          lastAssignedIndex = ROSTER.findIndex((s) => s.code === duty.effective.code);
+          // The leader goes to the back; absent students keep their place at the front.
+          const leaderIndex = ROSTER.findIndex((s) => s.code === duty.effective.code);
+          queue = queue.filter((i) => i !== leaderIndex);
+          queue.push(leaderIndex);
         }
         cursor = addDays(cursor, 1);
         guard += 1;
@@ -744,6 +754,8 @@
       if (!daily.effective) return daily;
       const base = daily.effective;
       const baseIndex = ROSTER.findIndex((s) => s.code === base.code);
+      const order = daily.order || ROSTER.map((_, i) => i);
+      const basePos = Math.max(0, order.indexOf(baseIndex));
       const map = getStatusMap(dateKey);
       const baseEntry = normalizeStatusEntry(map[base.code]);
 
@@ -758,7 +770,7 @@
         shifted = true;
         reason = entryIsUnavailable(baseEntry) ? baseEntry.type : baseEntry.type;
         for (let step = 1; step < ROSTER.length; step += 1) {
-          const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
+          const candidate = ROSTER[order[(basePos + step) % order.length]];
           const entry = normalizeStatusEntry(map[candidate.code]);
           if (!statusAvailableAtPeriod(entry, period)) continue;
           effective = candidate;
@@ -785,10 +797,10 @@
 
     function buildShiftNotice(duty) {
       if (!duty || !duty.effective || !duty.shifted) return null;
-      const start = ROSTER.findIndex((s) => s.code === duty.designated.code);
+      const order = duty.order || ROSTER.map((_, i) => i);
       const skipped = [];
-      for (let step = 0; step < ROSTER.length; step += 1) {
-        const student = ROSTER[(start + step) % ROSTER.length];
+      for (let step = 0; step < order.length; step += 1) {
+        const student = ROSTER[order[step]];
         if (student.code === duty.effective.code) break;
         const entry = getStatusEntry(duty.date, student);
         if (['absent', 'official', 'late', 'early'].includes(entry.type)) {
