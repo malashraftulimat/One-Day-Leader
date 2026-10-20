@@ -25,9 +25,10 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
 - Dynamic active-pool rotation:
   - Only students who are present/unregistered (or time-available) are eligible.
   - Absent and official-absence students are excluded for that day.
-  - The previous school day's leader is always bypassed to prevent consecutive duty.
-  - Returning students get first priority on their first day back.
-  - The cursor advances to the next active student after each assignment.
+  - The next school day always starts immediately after the last assigned leader.
+  - Any assignment consumes that student's turn, including fallback assignments.
+  - No student repeats until the active pool completes a full round.
+  - The cumulative pointer advances to the next active student after every assignment.
   - Cascades skip absent/official-absence students and the previous weekday's active leader.
 - Initial class state (when Firestore is first initialized on a weekday):
   - Base: 鈴木 斗和 — 欠席
