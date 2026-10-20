@@ -11,14 +11,16 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
 
 ## Features
 
-- Firebase Auth uses explicit `browserLocalPersistence`, so sessions survive reloads and code updates.
+- Firebase Auth uses explicit `browserSessionPersistence`: reloads in the same tab stay signed in, while new visits start at Sign In.
 - Anti-cache meta tags and an `APP_VERSION` auto-reload check keep deployed clients current.
 
-- 2-month (60-day) availability calendar.
-- Personal statuses: 出席 (Present), 欠席 (Absent), 公欠 (Official Absence).
+- 2-month (60-day) availability calendar with Japanese national holidays fetched from `holidays-jp.github.io`.
+- Personal statuses: 未登録 (default), 出席 (Present), 欠席 (Absent), 公欠 (Official Absence), 遅刻 (Late Arrival), 早退 (Early Leave).
+- Late/early statuses require a class-period selection.
+- Live class tracker banner based on the current device clock and the weekly timetable.
 - Weekdays only:
-  - Saturday and Sunday are displayed as **休日 (Weekend / Off-Day)**.
-  - No leader is assigned on weekends.
+  - Saturdays/Sundays and Japanese national holidays are displayed as **休日 / 祝日**.
+  - No leader is assigned on weekends or holidays.
   - Rotation freezes over the weekend and resumes Monday.
 - Persistent base leader with cascading fallback:
   - The base pointer remains fixed while the base leader is unavailable.

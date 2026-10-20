@@ -103,7 +103,7 @@
               </div>
               <div>
                 <p class="text-xs font-extrabold">2ヶ月先までの予定カレンダー</p>
-                <p class="mt-0.5 text-[11px] text-slate-400">出席・欠席・公欠を事前登録し、日直の交代をリアルタイムで確認できます。</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">出席・欠席・公欠・遅刻・早退を事前登録し、日直の交代をリアルタイムで確認できます。</p>
               </div>
             </div>
           </div>
@@ -264,6 +264,7 @@
     </header>
 
     <main class="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
+      <section id="liveBanner" class="fade-up"></section>
       <section id="myBanner" class="hidden"></section>
       <section id="todayHero" class="fade-up"></section>
       <section id="alertFeed" class="hidden"></section>
@@ -280,7 +281,7 @@
       </div>
 
       <footer class="flex flex-col items-center justify-between gap-2 py-6 text-[11px] text-slate-400 sm:flex-row">
-        <p>One Day Leader · 10名ホワイトリスト / 出席・欠席・公欠 / 60日先まで</p>
+        <p>One Day Leader · 10名ホワイトリスト / 出席・欠席・公欠・遅刻・早退 / 60日先まで</p>
         <span class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-400">Firebase Auth + Firestore</span>
       </footer>
     </main>
@@ -293,7 +294,7 @@
     import {
       getAuth, onAuthStateChanged, signInWithEmailAndPassword,
       createUserWithEmailAndPassword, signOut, updateProfile,
-      setPersistence, browserLocalPersistence
+      setPersistence, browserSessionPersistence
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
     import {
       getFirestore, collection, doc, query, where, orderBy, limit,
@@ -310,15 +311,15 @@
       measurementId: "G-HYSP31HZ42"
     };
 
-    const APP_VERSION = '1.0.1';
+    const APP_VERSION = '1.0.2';
     const VERSION_STORAGE_KEY = 'odl.appVersion.v1';
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
 
-    // Explicit local persistence keeps the student signed in across reloads and code updates.
-    setPersistence(auth, browserLocalPersistence).catch((err) => {
+    // Session persistence keeps this tab signed in across reloads; new visits start at Sign In.
+    setPersistence(auth, browserSessionPersistence).catch((err) => {
       console.warn('Auth persistence setup failed:', err);
     });
 
@@ -341,10 +342,51 @@
     const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
     const MAX_PLAN_DAYS = 60;
 
+    const PERIODS = [
+      { period: 1, start: '09:10', end: '10:00' },
+      { period: 2, start: '10:10', end: '11:00' },
+      { period: 3, start: '11:10', end: '12:00' },
+      { period: 4, start: '12:10', end: '13:00' },
+      { period: 5, start: '13:10', end: '14:00' },
+      { period: 6, start: '14:10', end: '15:00' },
+      { period: 7, start: '15:10', end: '16:00' },
+      { period: 8, start: '16:10', end: '17:00' }
+    ];
+
+    const TIMETABLE = {
+      1: [
+        { label: '1-3時限', start: '09:10', end: '12:00', room: '301 Game Lab' },
+        { label: '4時限', start: '12:10', end: '13:00', room: '301 Game Lab' },
+        { label: '6-7時限', start: '14:10', end: '16:00', room: '305 アニメPC' }
+      ],
+      2: [
+        { label: '3-4時限', start: '11:10', end: '13:00', room: '807 教室' },
+        { label: '6-7時限', start: '14:10', end: '16:00', room: '305 アニメPC' },
+        { label: '8時限', start: '16:10', end: '17:00', room: '305 アニメPC' }
+      ],
+      3: [
+        { label: '1-3時限', start: '09:10', end: '12:00', room: '305 アニメPC' },
+        { label: '3-4時限', start: '11:10', end: '13:00', room: '307 オープンラボ / 301 Game Lab' },
+        { label: '6時限', start: '14:10', end: '15:00', room: '401 教室' }
+      ],
+      4: [
+        { label: '1-3時限', start: '09:10', end: '12:00', room: '301 Game Lab' },
+        { label: '5時限', start: '13:10', end: '14:00', room: '305 アニメPC' },
+        { label: '7時限', start: '15:10', end: '16:00', room: '301 Game Lab' }
+      ],
+      5: [
+        { label: '2-4時限', start: '10:10', end: '13:00', room: '305 アニメPC' },
+        { label: '5時限', start: '13:10', end: '14:00', room: '805・806 教室' }
+      ]
+    };
+
     const STATUS = {
+      unregistered: { label: '未登録', labelEn: 'Unregistered', pill: 'bg-slate-100 text-slate-500 ring-slate-200', dot: 'bg-slate-300', onBtn: '', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-100' },
       present: { label: '出席', labelEn: 'Present', pill: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500', onBtn: 'bg-emerald-600 text-white ring-emerald-600 shadow-sm shadow-emerald-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50' },
       absent: { label: '欠席', labelEn: 'Absent', pill: 'bg-rose-50 text-rose-700 ring-rose-200', dot: 'bg-rose-500', onBtn: 'bg-rose-600 text-white ring-rose-600 shadow-sm shadow-rose-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-rose-50' },
-      official: { label: '公欠', labelEn: 'Official Absence', pill: 'bg-amber-50 text-amber-700 ring-amber-200', dot: 'bg-amber-500', onBtn: 'bg-amber-500 text-white ring-amber-500 shadow-sm shadow-amber-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-amber-50' }
+      official: { label: '公欠', labelEn: 'Official Absence', pill: 'bg-amber-50 text-amber-700 ring-amber-200', dot: 'bg-amber-500', onBtn: 'bg-amber-500 text-white ring-amber-500 shadow-sm shadow-amber-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-amber-50' },
+      late: { label: '遅刻', labelEn: 'Late Arrival', pill: 'bg-sky-50 text-sky-700 ring-sky-200', dot: 'bg-sky-500', onBtn: 'bg-sky-500 text-white ring-sky-500 shadow-sm shadow-sky-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-sky-50' },
+      early: { label: '早退', labelEn: 'Early Leave', pill: 'bg-violet-50 text-violet-700 ring-violet-200', dot: 'bg-violet-500', onBtn: 'bg-violet-600 text-white ring-violet-600 shadow-sm shadow-violet-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-violet-50' }
     };
 
     const ANCHOR_FALLBACK_KEY = 'odl.firebase.rotationAnchor.v1';
@@ -451,9 +493,73 @@
       return map && typeof map === 'object' ? map : {};
     }
 
+    function normalizeStatusEntry(value) {
+      if (value && typeof value === 'object') {
+        const type = STATUS[value.type] ? value.type : 'unregistered';
+        const period = Number(value.period);
+        return { type, period: period >= 1 && period <= 8 ? period : null };
+      }
+      if (typeof value === 'string' && STATUS[value]) return { type: value, period: null };
+      return { type: 'unregistered', period: null };
+    }
+
+    function getStatusEntry(dateKey, student) {
+      if (!student) return { type: 'unregistered', period: null };
+      return normalizeStatusEntry(getStatusMap(dateKey)[student.code]);
+    }
+
     function isWeekend(dateKey) {
       const day = parseKey(dateKey).getDay();
       return day === 0 || day === 6;
+    }
+
+    function isHoliday(dateKey) {
+      return Boolean(JAPAN_HOLIDAYS[dateKey]);
+    }
+
+    function getHolidayName(dateKey) {
+      return JAPAN_HOLIDAYS[dateKey] || '';
+    }
+
+    function isOffDay(dateKey) {
+      return isWeekend(dateKey) || isHoliday(dateKey);
+    }
+
+    async function loadJapaneseHolidays() {
+      if (holidayFetchPromise) return holidayFetchPromise;
+      holidayFetchPromise = (async () => {
+        try {
+          const cached = sessionStorage.getItem('odl.japanHolidays.v1');
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && typeof parsed === 'object') {
+              JAPAN_HOLIDAYS = parsed;
+              holidaysLoaded = true;
+              rebuildDutyCache();
+              if (firebaseUser && currentStudent) renderAll();
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('Holiday cache read failed:', err);
+        }
+        try {
+          const response = await fetch('https://holidays-jp.github.io/api/v1/date.json', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Holiday API HTTP ' + response.status);
+          const data = await response.json();
+          if (data && typeof data === 'object' && !Array.isArray(data)) {
+            JAPAN_HOLIDAYS = data;
+            try { sessionStorage.setItem('odl.japanHolidays.v1', JSON.stringify(data)); } catch (err) { console.warn(err); }
+            holidaysLoaded = true;
+            rebuildDutyCache();
+            if (firebaseUser && currentStudent) renderAll();
+          }
+        } catch (err) {
+          console.warn('Japanese holiday fetch failed:', err);
+          holidaysLoaded = true;
+        }
+      })();
+      return holidayFetchPromise;
     }
 
     const CLASS_ALERT_TIMES = {
@@ -470,7 +576,7 @@
 
     function getClassAlertInfo(dateKey) {
       const day = parseKey(dateKey).getDay();
-      if (day === 0 || day === 6) return null;
+      if (day === 0 || day === 6 || isHoliday(dateKey)) return null;
       const config = CLASS_ALERT_TIMES[day];
       if (!config) return null;
       return {
@@ -483,11 +589,28 @@
 
     function weekendDuty(dateKey) {
       return {
-        date: dateKey, isWeekend: true, designated: null, effective: null,
+        date: dateKey, isWeekend: true, isHoliday: false, isOffDay: true, holidayName: '',
+        designated: null, effective: null,
         shifted: false, steps: 0, reason: null,
         absentCodes: new Set(), officialCodes: new Set(), unavailableCodes: new Set(),
         absents: [], officials: [], unavailable: []
       };
+    }
+
+    function holidayDuty(dateKey) {
+      return {
+        date: dateKey, isWeekend: false, isHoliday: true, isOffDay: true, holidayName: getHolidayName(dateKey),
+        designated: null, effective: null,
+        shifted: false, steps: 0, reason: null,
+        absentCodes: new Set(), officialCodes: new Set(), unavailableCodes: new Set(),
+        absents: [], officials: [], unavailable: []
+      };
+    }
+
+    function offDayDuty(dateKey) {
+      if (isHoliday(dateKey)) return holidayDuty(dateKey);
+      if (isWeekend(dateKey)) return weekendDuty(dateKey);
+      return null;
     }
 
     // Persistent-base simulation over weekdays only:
@@ -496,11 +619,12 @@
     // - If the base is absent, the pointer stays for the next weekday.
     // - Cascading fallback skips the previous weekday's active leader.
     function buildDutyForDay(dateKey, pointer, previousActiveCode) {
-      if (isWeekend(dateKey)) return weekendDuty(dateKey);
+      const offDay = offDayDuty(dateKey);
+      if (offDay) return offDay;
       const map = getStatusMap(dateKey);
       const base = ROSTER[pointer];
-      const absentCodes = new Set(ROSTER.filter((s) => map[s.code] === 'absent').map((s) => s.code));
-      const officialCodes = new Set(ROSTER.filter((s) => map[s.code] === 'official').map((s) => s.code));
+      const absentCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'absent').map((s) => s.code));
+      const officialCodes = new Set(ROSTER.filter((s) => normalizeStatusEntry(map[s.code]).type === 'official').map((s) => s.code));
       const unavailableCodes = new Set([...absentCodes, ...officialCodes]);
 
       let effective = null;
@@ -512,7 +636,7 @@
         effective = base;
       } else {
         shifted = true;
-        reason = map[base.code] === 'official' ? 'official' : 'absent';
+        reason = normalizeStatusEntry(map[base.code]).type === 'official' ? 'official' : 'absent';
         for (let step = 1; step < ROSTER.length; step += 1) {
           const candidate = ROSTER[(pointer + step) % ROSTER.length];
           if (unavailableCodes.has(candidate.code)) continue;
@@ -551,7 +675,7 @@
       while (cursor <= endDate && guard < 800) {
         const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
         dutyCache[cursor] = duty;
-        if (!duty.isWeekend) {
+        if (!duty.isOffDay) {
           if (duty.effective) {
             if (duty.effective.code === duty.designated.code) {
               pointer = (pointer + 1) % ROSTER.length;
@@ -577,7 +701,7 @@
       while (cursor <= dateKey && guard < 800) {
         const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
         dutyCache[cursor] = duty;
-        if (!duty.isWeekend) {
+        if (!duty.isOffDay) {
           if (duty.effective) {
             if (duty.effective.code === duty.designated.code) {
               pointer = (pointer + 1) % ROSTER.length;
@@ -590,12 +714,92 @@
         cursor = addDays(cursor, 1);
         guard += 1;
       }
-      return dutyCache[dateKey] || (isWeekend(dateKey) ? weekendDuty(dateKey) : buildDutyForDay(dateKey, ROTATION_ANCHOR.index, null));
+      return dutyCache[dateKey] || offDayDuty(dateKey) || buildDutyForDay(dateKey, ROTATION_ANCHOR.index, null);
     }
 
     function designatedIndex(dateKey) {
       const designated = computeDuty(dateKey).designated;
       return designated ? ROSTER.findIndex((s) => s.code === designated.code) : -1;
+    }
+
+    function timeToMinutes(time) {
+      const [h, m] = String(time).split(':').map(Number);
+      return h * 60 + m;
+    }
+
+    function getCurrentPeriodNumber(date = new Date()) {
+      const minutes = date.getHours() * 60 + date.getMinutes();
+      for (const item of PERIODS) {
+        if (minutes < timeToMinutes(item.start)) return item.period;
+        if (minutes < timeToMinutes(item.end)) return item.period;
+      }
+      return null;
+    }
+
+    function statusAvailableAtPeriod(entry, period) {
+      if (!period) return true;
+      if (entry.type === 'absent' || entry.type === 'official') return false;
+      if (entry.type === 'late' && entry.period) return period >= entry.period;
+      if (entry.type === 'early' && entry.period) return period < entry.period;
+      return true;
+    }
+
+    function previousWeekdayActiveCode(dateKey) {
+      let cursor = addDays(dateKey, -1);
+      let guard = 0;
+      while (isOffDay(cursor) && guard < 10) {
+        cursor = addDays(cursor, -1);
+        guard += 1;
+      }
+      const duty = computeDuty(cursor);
+      return duty.effective ? duty.effective.code : null;
+    }
+
+    function computeLiveDuty(dateKey, period) {
+      const offDay = offDayDuty(dateKey);
+      if (offDay) return offDay;
+      const daily = computeDuty(dateKey);
+      const base = daily.designated;
+      const baseIndex = ROSTER.findIndex((s) => s.code === base.code);
+      const map = getStatusMap(dateKey);
+      const previousActiveCode = previousWeekdayActiveCode(dateKey);
+      const baseEntry = normalizeStatusEntry(map[base.code]);
+
+      let effective = null;
+      let shifted = false;
+      let steps = 0;
+      let reason = null;
+
+      if (statusAvailableAtPeriod(baseEntry, period)) {
+        effective = base;
+      } else {
+        shifted = true;
+        reason = baseEntry.type;
+        for (let step = 1; step < ROSTER.length; step += 1) {
+          const candidate = ROSTER[(baseIndex + step) % ROSTER.length];
+          const entry = normalizeStatusEntry(map[candidate.code]);
+          if (!statusAvailableAtPeriod(entry, period)) continue;
+          if (previousActiveCode && candidate.code === previousActiveCode) continue;
+          effective = candidate;
+          steps = step;
+          break;
+        }
+      }
+
+      return { ...daily, isLive: dateKey === TODAY, timeAware: true, livePeriod: period, liveReason: reason, effective, shifted, steps };
+    }
+
+    function getActiveDuty(dateKey) {
+      if (dateKey !== TODAY) return computeDuty(dateKey);
+      const period = getCurrentPeriodNumber();
+      if (!period) return computeDuty(dateKey);
+      return computeLiveDuty(dateKey, period);
+    }
+
+    function getDisplayDuty(dateKey) {
+      if (dateKey === TODAY) return getActiveDuty(dateKey);
+      const firstPeriod = getFirstPeriodNumber(dateKey);
+      return computeLiveDuty(dateKey, firstPeriod);
     }
 
     function buildShiftNotice(duty) {
@@ -621,7 +825,7 @@
     function nextWeekdayDuty(dateKey) {
       let cursor = addDays(dateKey, 1);
       let guard = 0;
-      while (isWeekend(cursor) && guard < 7) {
+      while (isOffDay(cursor) && guard < 7) {
         cursor = addDays(cursor, 1);
         guard += 1;
       }
@@ -629,9 +833,7 @@
     }
 
     function statusOf(dateKey, student) {
-      if (!student) return 'present';
-      const value = getStatusMap(dateKey)[student.code];
-      return value === 'absent' || value === 'official' ? value : 'present';
+      return getStatusEntry(dateKey, student).type;
     }
 
     function studentByCode(code) {
@@ -657,6 +859,9 @@
        ============================================================ */
     let statuses = {};
     let alerts = [];
+    let JAPAN_HOLIDAYS = {};
+    let holidaysLoaded = false;
+    let holidayFetchPromise = null;
     let firebaseUser = null;
     let currentStudent = null;
     let session = null;
@@ -667,6 +872,8 @@
     let authTab = 'signin';
     let selectedDate = TODAY;
     let calendarMonth = TODAY.slice(0, 7);
+    let periodDraftType = null;
+    let periodDraftPeriod = 2;
     let cloudState = 'idle'; // idle | connecting | live | error
     let cloudError = '';
     let cloudUnsubs = [];
@@ -698,9 +905,16 @@
       return `<div class="${size} grid shrink-0 place-items-center rounded-2xl font-extrabold text-white shadow-sm" style="background:linear-gradient(135deg, ${student.colors[0]}, ${student.colors[1]})" aria-hidden="true"><span class="${text}">${escapeHtml(initials(student.name))}</span></div>`;
     }
 
-    function statusPill(status) {
-      const style = STATUS[status] || STATUS.present;
-      return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${style.pill}"><span class="h-1.5 w-1.5 rounded-full ${style.dot}"></span>${style.label}</span>`;
+    function statusLabel(status, period) {
+      const style = STATUS[status] || STATUS.unregistered;
+      if (status === 'late' && period) return `遅刻（${period}限から）`;
+      if (status === 'early' && period) return `早退（${period}限で）`;
+      return style.label;
+    }
+
+    function statusPill(status, period = null) {
+      const style = STATUS[status] || STATUS.unregistered;
+      return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${style.pill}"><span class="h-1.5 w-1.5 rounded-full ${style.dot}"></span>${statusLabel(status, period)}</span>`;
     }
 
     function cardHeader(eyebrow, title, right = '') {
@@ -909,7 +1123,7 @@
 
     function maybeAnnounceLeader() {
       if (!currentStudent) return;
-      const duty = computeDuty(TODAY);
+      const duty = getActiveDuty(TODAY);
       if (duty.effective && duty.effective.id === currentStudent.id) {
         announceLeader(duty, duty.shifted);
       }
@@ -921,7 +1135,7 @@
         const ref = doc(db, 'statuses', TODAY);
         const snap = await getDoc(ref);
         if (snap.exists()) return;
-        const seeded = { '2608006': 'absent', '2608005': 'official' };
+        const seeded = { '2608006': 'absent', '2608005': 'official', '2608001': 'present' };
         await setDoc(ref, {
           date: TODAY,
           statuses: seeded,
@@ -1225,7 +1439,8 @@
       const delta = now.getTime() - target.getTime();
       if (delta < 0 || delta > 10 * 60 * 1000) return;
 
-      const duty = computeDuty(TODAY);
+      const firstPeriod = getFirstPeriodNumber(TODAY);
+      const duty = computeLiveDuty(TODAY, firstPeriod);
       if (!duty.effective) return;
       const content = `🔔 本日の日直通知: 本日の日直は 【${duty.effective.name}】 さんです！準備をお願いします。`;
       const toastMap = readSentMap(SCHEDULED_TOAST_KEY);
@@ -1325,22 +1540,25 @@
        ============================================================ */
     function renderHeader() {
       if (!currentStudent) return;
-      const duty = computeDuty(TODAY);
+      const duty = getActiveDuty(TODAY);
       document.getElementById('headerAvatar').innerHTML = avatar(currentStudent, 'h-8 w-8', 'text-[10px]');
       document.getElementById('headerName').textContent = currentStudent.name;
       const chip = document.getElementById('headerLeaderChip');
-      chip.innerHTML = duty.isWeekend
-        ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-600">休日 (Weekend / Off-Day)</span>`
-        : duty.effective
-        ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">${iconCrown('h-3.5 w-3.5')} 今日の日直: ${escapeHtml(duty.effective.name)}${duty.shifted ? '（交代）' : ''}</span>`
-        : `<span class="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600">${iconLock('h-3.5 w-3.5')} 担当者不在</span>`;
+      if (duty.isOffDay) {
+        chip.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full border ${duty.isHoliday ? 'border-rose-100 bg-rose-50 text-rose-600' : 'border-sky-100 bg-sky-50 text-sky-600'} px-2.5 py-1 text-[10px] font-bold">${duty.isHoliday ? '祝日 (National Holiday)' : '休日 (Weekend / Off-Day)'}</span>`;
+      } else if (duty.effective) {
+        const entry = getStatusEntry(TODAY, duty.effective);
+        chip.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">${iconCrown('h-3.5 w-3.5')} 今日の日直: ${escapeHtml(duty.effective.name)}${duty.shifted ? '（交代）' : ''}${duty.isLive ? ` · ${duty.livePeriod}限` : ''}</span>`;
+      } else {
+        chip.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600">${iconLock('h-3.5 w-3.5')} 担当者不在</span>`;
+      }
     }
 
     function renderUserMenu() {
       if (!currentStudent) return;
       const duty = computeDuty(TODAY);
       const isLeader = duty.effective && duty.effective.id === currentStudent.id;
-      const roleLabel = duty.isWeekend ? '休日' : isLeader ? '本日の日直' : '一般生徒';
+      const roleLabel = duty.isOffDay ? '休日・祝日' : isLeader ? '本日の日直' : '一般生徒';
       const panel = document.getElementById('userMenuPanel');
       panel.innerHTML = `
         <div class="rounded-xl bg-slate-50 p-3">
@@ -1379,11 +1597,16 @@
     /* ============================================================
        Runtime alerts
        ============================================================ */
-    async function publishStatusAlert(student, status, dateKey, before, after) {
-      const label = STATUS[status].label;
-      const labelEn = STATUS[status].labelEn;
+    async function publishStatusAlert(student, status, period, dateKey, before, after) {
+      const label = statusLabel(status, period);
+      const labelEn = status === 'late' && period
+        ? `Late Arrival from period ${period}`
+        : status === 'early' && period
+          ? `Early Leave from period ${period}`
+          : STATUS[status].labelEn;
       const transferred = (before.effective ? before.effective.code : null) !== (after.effective ? after.effective.code : null);
       const toName = after.effective ? after.effective.name : null;
+
       const messageJa = `${student.name} さんが ${dateLabel(dateKey)} を「${label}」で登録しました。` +
         (transferred
           ? (toName ? ` 日直が ${toName} さんに交代しました。` : ' 日直を務められる出席者がいなくなりました。')
@@ -1398,6 +1621,7 @@
         type: transferred ? 'fallback' : 'status',
         priority: transferred ? 'high' : 'normal',
         status,
+        period: period || null,
         reporterCode: student.code,
         reporterName: student.name,
         fromLeaderCode: before.effective ? before.effective.code : null,
@@ -1420,8 +1644,8 @@
        Render: active leader banner
        ============================================================ */
     function renderBanner() {
-      const todayDuty = computeDuty(TODAY);
-      const selectedDuty = computeDuty(selectedDate);
+      const todayDuty = getActiveDuty(TODAY);
+      const selectedDuty = getDisplayDuty(selectedDate);
       const todayIsMe = Boolean(currentStudent && todayDuty.effective && todayDuty.effective.id === currentStudent.id);
       const selectedIsMe = Boolean(currentStudent && selectedDuty.effective && selectedDuty.effective.id === currentStudent.id);
       const el = document.getElementById('myBanner');
@@ -1432,7 +1656,7 @@
       const duty = isTodayBanner ? todayDuty : selectedDuty;
       const title = isTodayBanner ? "You are today's active One Day Leader!" : 'You are scheduled as One Day Leader!';
       const subtitle = isTodayBanner
-        ? 'あなたは本日の日直です。ステータスボードでクラスの状況を確認できます。'
+        ? `あなたは本日の日直です。${duty.isLive ? `現在は${duty.livePeriod}限の日直です。` : ''}ステータスボードでクラスの状況を確認できます。`
         : `あなたは ${dateLabel(selectedDate)} の日直に割り当てられています。予定カレンダーで出席状況を確認してください。`;
 
       el.classList.remove('hidden');
@@ -1441,7 +1665,6 @@
           <div class="relative overflow-hidden rounded-[23px] bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white sm:p-6">
             <div class="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl"></div>
             <div class="absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-2xl"></div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" class="spin-slow absolute -right-6 -top-6 h-32 w-32 text-white/15" aria-hidden="true"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/></svg>
             <div class="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex items-start gap-3">
                 <div class="pulse-ring grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/20 backdrop-blur-sm">${iconCrown('h-6 w-6')}</div>
@@ -1449,7 +1672,7 @@
                   <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/70">${isTodayBanner ? 'Leader focus · Today' : 'Leader focus · Upcoming'}</p>
                   <p class="mt-0.5 text-lg font-black leading-snug sm:text-xl">${title}</p>
                   <p class="mt-1 text-xs font-medium text-white/80">${subtitle}</p>
-                  ${duty.shifted ? `<p class="mt-1 inline-flex rounded-lg bg-white/15 px-2 py-1 text-[10px] font-bold text-white/90">${escapeHtml(duty.designated.name)} さんの欠席・公欠により自動交代</p>` : ''}
+                  ${duty.shifted ? `<p class="mt-1 inline-flex rounded-lg bg-white/15 px-2 py-1 text-[10px] font-bold text-white/90">${duty.isLive && duty.liveReason ? STATUS[duty.liveReason].label : '欠席・公欠'}により自動交代</p>` : ''}
                 </div>
               </div>
               <button type="button" data-action="scroll-schedule" class="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-indigo-700 shadow-lg shadow-indigo-900/20 transition hover:-translate-y-0.5 hover:bg-indigo-50 active:translate-y-0">予定カレンダーを見る →</button>
@@ -1462,70 +1685,74 @@
        Render: today hero
        ============================================================ */
     function renderHero() {
-      const duty = computeDuty(TODAY);
-      if (duty.isWeekend) {
+      const duty = getActiveDuty(TODAY);
+      if (duty.isOffDay) {
         const nextDuty = nextWeekdayDuty(TODAY);
+        const holiday = duty.isHoliday;
         document.getElementById('todayHero').innerHTML = `
           <div class="relative overflow-hidden rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-7">
-            <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-sky-100 via-indigo-100 to-violet-100 blur-3xl"></div>
+            <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gradient-to-br ${holiday ? 'from-rose-100 via-pink-100 to-fuchsia-100' : 'from-sky-100 via-indigo-100 to-violet-100'} blur-3xl"></div>
             <div class="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div class="flex items-center gap-4">
-                <div class="grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-sky-100 to-indigo-100 text-sky-500 ring-1 ring-inset ring-sky-200 sm:h-24 sm:w-24">
+                <div class="grid h-20 w-20 place-items-center rounded-3xl ${holiday ? 'bg-gradient-to-br from-rose-100 to-pink-100 text-rose-500 ring-rose-200' : 'bg-gradient-to-br from-sky-100 to-indigo-100 text-sky-500 ring-sky-200'} ring-1 ring-inset sm:h-24 sm:w-24">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-10 w-10"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 21v-3M12 21v-3M16 21v-3" stroke-linecap="round"/></svg>
                 </div>
                 <div>
-                  <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">休日 (Weekend / Off-Day)</span>
-                  <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">本日は休日です</h2>
-                  <p class="mt-2 text-[11px] leading-relaxed text-slate-500">土曜・日曜は日直ローテーションの対象外です。順番は凍結され、次の平日に再開します。</p>
+                  <span class="inline-flex items-center gap-1 rounded-full ${holiday ? 'bg-rose-100 text-rose-700 ring-rose-200' : 'bg-sky-100 text-sky-700 ring-sky-200'} px-2.5 py-1 text-[11px] font-extrabold ring-1 ring-inset">${holiday ? '祝日 (National Holiday)' : '休日 (Weekend / Off-Day)'}</span>
+                  <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">${holiday ? escapeHtml(duty.holidayName) : '本日は休日です'}</h2>
+                  <p class="mt-2 text-[11px] leading-relaxed text-slate-500">${holiday ? '祝日のため日直ローテーションは実施しません。' : '土曜・日曜は日直ローテーションの対象外です。'}順番は凍結され、次の平日に再開します。</p>
                 </div>
               </div>
               <div class="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
-                <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Next weekday</p>
+                <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Next school day</p>
                 <p class="mt-1 text-sm font-black text-slate-900">${nextDuty.effective ? escapeHtml(nextDuty.effective.name) : '不在'}</p>
                 <p class="mt-0.5 text-[10px] font-medium text-indigo-500">${dateLabel(nextDuty.date)}</p>
               </div>
             </div>
-            <div class="mt-5 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-[11px] font-bold text-slate-500 ring-1 ring-inset ring-slate-100">
-              <span>${dateLabel(TODAY)}</span><span class="text-sky-600">Leader assignment paused</span>
-            </div>
           </div>`;
         return;
       }
-      const absentCount = ROSTER.filter((s) => statusOf(TODAY, s) === 'absent').length;
-      const officialCount = ROSTER.filter((s) => statusOf(TODAY, s) === 'official').length;
-      const activeCount = Math.max(0, ROSTER.length - absentCount - officialCount);
-      const tomorrow = computeDuty(addDays(TODAY, 1));
-      const isMeLeader = Boolean(currentStudent && duty.effective && duty.effective.id === currentStudent.id);
 
-      const unavailableChips = duty.unavailable.map((s) => {
-        const status = statusOf(TODAY, s);
-        const style = STATUS[status];
-        return `<span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${style.pill}">${escapeHtml(s.name)} <span class="opacity-80">${style.label}</span></span>`;
+      const presentCount = ROSTER.filter((x) => ['present', 'late', 'early'].includes(statusOf(TODAY, x))).length;
+      const absentCount = ROSTER.filter((x) => statusOf(TODAY, x) === 'absent').length;
+      const officialCount = ROSTER.filter((x) => statusOf(TODAY, x) === 'official').length;
+      const unregisteredCount = ROSTER.filter((x) => statusOf(TODAY, x) === 'unregistered').length;
+      const lateCount = ROSTER.filter((x) => statusOf(TODAY, x) === 'late').length;
+      const earlyCount = ROSTER.filter((x) => statusOf(TODAY, x) === 'early').length;
+      const nextDuty = nextWeekdayDuty(TODAY);
+      const isMeLeader = Boolean(currentStudent && duty.effective && duty.effective.id === currentStudent.id);
+      const leaderEntry = duty.effective ? getStatusEntry(TODAY, duty.effective) : null;
+
+      const unavailableChips = duty.unavailable.map((x) => {
+        const entry = getStatusEntry(TODAY, x);
+        return `<span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${STATUS[entry.type].pill}">${escapeHtml(x.name)} <span class="opacity-80">${statusLabel(entry.type, entry.period)}</span></span>`;
       }).join('');
 
       const leaderBlock = duty.effective
         ? `${avatar(duty.effective, 'h-20 w-20 sm:h-24 sm:w-24', 'text-2xl sm:text-3xl')}
            <div class="min-w-0 flex-1">
              <div class="flex flex-wrap items-center gap-2">
-               <span class="text-xs font-bold text-slate-500">本日の担当</span>
-               ${statusPill(statusOf(TODAY, duty.effective))}
+               <span class="text-xs font-bold text-slate-500">${duty.isLive ? `${duty.livePeriod}限の日直` : '本日の担当'}</span>
+               ${statusPill(leaderEntry.type, leaderEntry.period)}
                ${isMeLeader ? '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-extrabold text-white">あなた</span>' : ''}
+               ${duty.isLive ? '<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700 ring-1 ring-inset ring-emerald-200">LIVE</span>' : ''}
                ${duty.shifted ? '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold text-amber-700 ring-1 ring-inset ring-amber-200">自動フォールバック</span>' : ''}
              </div>
              <h2 class="mt-1 truncate text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">${escapeHtml(duty.effective.name)}</h2>
              ${duty.shifted
                ? `<div class="mt-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
-                    <p class="font-extrabold">${STATUS[duty.reason] ? STATUS[duty.reason].label : '欠席・公欠'}により担当を変更しました</p>
-                    <p class="mt-0.5">本来の担当 <span class="font-bold line-through decoration-amber-500/70">${escapeHtml(duty.designated.name)}</span> → <span class="font-black">${escapeHtml(duty.effective.name)}</span>${duty.steps > 1 ? `（${duty.steps}人先）` : ''}</p>
+                    <p class="font-extrabold">${duty.isLive && duty.liveReason ? `${STATUS[duty.liveReason].label}により時間帯交代` : '欠席・公欠により担当を変更しました'}</p>
+                    <p class="mt-0.5">本来の担当 <span class="font-bold line-through decoration-amber-500/70">${escapeHtml(duty.designated.name)}</span> → <span class="font-black">${escapeHtml(duty.effective.name)}</span></p>
                     ${unavailableChips ? `<p class="mt-1 flex flex-wrap gap-1">${unavailableChips}</p>` : ''}
                   </div>`
-               : `<p class="mt-2 text-[11px] leading-relaxed text-slate-500">指定ローテーションどおりの担当です。担当者が欠席または公欠を登録すると、次の出席可能な生徒へ自動で交代します。</p>`}
+               : `<p class="mt-2 text-[11px] leading-relaxed text-slate-500">${duty.isLive ? `現在の${duty.livePeriod}限はこの生徒が日直です。` : '指定ローテーションどおりの担当です。'}欠席・公欠・遅刻・早退は時間帯に応じて自動で交代します。</p>`}
+             ${leaderEntry.type === 'unregistered' ? '<p class="mt-2 text-[10px] font-bold text-slate-400">※ 未登録ですが、日直判定では出席扱いです。</p>' : ''}
            </div>`
         : `${avatar(duty.designated, 'h-20 w-20 sm:h-24 sm:w-24', 'text-2xl sm:text-3xl opacity-40')}
            <div class="min-w-0 flex-1">
              <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-extrabold text-rose-700 ring-1 ring-inset ring-rose-200">担当者不在</span>
              <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">出席可能な日直がいません</h2>
-             <p class="mt-2 text-[11px] leading-relaxed text-slate-500">本日は全員が欠席または公欠のため、担当者を決定できません。</p>
+             <p class="mt-2 text-[11px] leading-relaxed text-slate-500">本日は全員が欠席・公欠のため、担当者を決定できません。</p>
            </div>`;
 
       document.getElementById('todayHero').innerHTML = `
@@ -1539,17 +1766,19 @@
               </div>
               <div class="flex flex-col items-end gap-1">
                 <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">Day ${designatedIndex(TODAY) + 1} / ${ROSTER.length}</span>
-                <span class="text-[10px] font-medium text-slate-400">次の担当: ${tomorrow.effective ? escapeHtml(tomorrow.effective.name) : '不在'}</span>
+                <span class="text-[10px] font-medium text-slate-400">次の平日: ${nextDuty.effective ? escapeHtml(nextDuty.effective.name) : '不在'}</span>
               </div>
             </div>
             <div class="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
               <div class="flex items-center gap-4 sm:flex-1">${leaderBlock}</div>
-              <div class="grid shrink-0 grid-cols-3 gap-2">
-                <div class="rounded-2xl bg-emerald-50 px-3 py-2.5 text-center ring-1 ring-inset ring-emerald-100"><p class="text-xl font-black text-emerald-600">${activeCount}</p><p class="text-[10px] font-bold text-emerald-700/70">出席可能</p></div>
+              <div class="grid shrink-0 grid-cols-2 gap-2 sm:grid-cols-4">
+                <div class="rounded-2xl bg-emerald-50 px-3 py-2.5 text-center ring-1 ring-inset ring-emerald-100"><p class="text-xl font-black text-emerald-600">${presentCount}</p><p class="text-[10px] font-bold text-emerald-700/70">出席</p></div>
+                <div class="rounded-2xl bg-slate-50 px-3 py-2.5 text-center ring-1 ring-inset ring-slate-200"><p class="text-xl font-black text-slate-500">${unregisteredCount}</p><p class="text-[10px] font-bold text-slate-400">未登録</p></div>
                 <div class="rounded-2xl bg-rose-50 px-3 py-2.5 text-center ring-1 ring-inset ring-rose-100"><p class="text-xl font-black text-rose-600">${absentCount}</p><p class="text-[10px] font-bold text-rose-700/70">欠席</p></div>
                 <div class="rounded-2xl bg-amber-50 px-3 py-2.5 text-center ring-1 ring-inset ring-amber-100"><p class="text-xl font-black text-amber-600">${officialCount}</p><p class="text-[10px] font-bold text-amber-700/70">公欠</p></div>
               </div>
             </div>
+            ${(lateCount || earlyCount) ? `<p class="mt-3 text-[10px] font-bold text-slate-500">遅刻 ${lateCount}名 / 早退 ${earlyCount}名</p>` : ''}
             ${unavailableChips ? `<div class="mt-4 flex flex-wrap gap-1.5">${unavailableChips}</div>` : ''}
           </div>
         </div>`;
@@ -1565,51 +1794,57 @@
       if (calendarMonth < minMonth) calendarMonth = minMonth;
       if (calendarMonth > maxMonth) calendarMonth = maxMonth;
 
-      const selectedDuty = computeDuty(selectedDate);
-      const myStatus = statusOf(selectedDate, currentStudent);
+      const selectedDuty = getActiveDuty(selectedDate);
+      const myEntry = getStatusEntry(selectedDate, currentStudent);
+      const selectedOffDay = selectedDuty.isOffDay;
+      const selectedHoliday = selectedDuty.isHoliday;
       const isTodaySelected = selectedDate === TODAY;
       const firstWeekday = parseKey(`${calendarMonth}-01`).getDay();
       const totalDays = daysInMonth(calendarMonth);
 
       let cells = '';
-      for (let i = 0; i < firstWeekday; i += 1) cells += '<div class="min-h-[68px] sm:min-h-[84px]" aria-hidden="true"></div>';
+      for (let i = 0; i < firstWeekday; i += 1) cells += '<div class="min-h-[68px] sm:min-h-[88px]" aria-hidden="true"></div>';
       for (let day = 1; day <= totalDays; day += 1) {
         const dateKey = `${calendarMonth}-${pad(day)}`;
         const inRange = isPlanDate(dateKey);
         const isToday = dateKey === TODAY;
         const isSelected = dateKey === selectedDate;
         const weekend = isWeekend(dateKey);
+        const holiday = isHoliday(dateKey);
+        const offDay = weekend || holiday;
         const dayOfWeek = parseKey(dateKey).getDay();
         const isSunday = dayOfWeek === 0;
         const isSaturday = dayOfWeek === 6;
-        const duty = inRange ? computeDuty(dateKey) : null;
-        const personalStatus = !weekend && inRange ? statusOf(dateKey, currentStudent) : null;
-        const statusClass = personalStatus === 'absent'
-          ? 'bg-rose-100 text-rose-700'
-          : personalStatus === 'official'
-            ? 'bg-amber-100 text-amber-700'
-            : personalStatus === 'present'
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-slate-100 text-slate-400';
+        const duty = inRange ? getDisplayDuty(dateKey) : null;
+        const entry = !offDay && inRange ? getStatusEntry(dateKey, currentStudent) : null;
+        const compactLabel = entry
+          ? entry.type === 'late'
+            ? `遅刻${entry.period ? entry.period + '限~' : ''}`
+            : entry.type === 'early'
+              ? `早退${entry.period ? entry.period + '限' : ''}`
+              : STATUS[entry.type].label
+          : '';
 
-        let cellClass = 'relative flex min-h-[68px] flex-col items-center justify-start rounded-xl border p-1 text-center transition sm:min-h-[84px] sm:p-1.5 ';
+        let cellClass = 'relative flex min-h-[68px] flex-col items-center justify-start rounded-xl border p-1 text-center transition sm:min-h-[88px] sm:p-1.5 ';
         if (!inRange) cellClass += 'cursor-default border-transparent bg-slate-50/50 text-slate-300';
         else if (isSelected) cellClass += 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 shadow-sm';
         else if (isToday) cellClass += 'border-fuchsia-400 bg-fuchsia-50/70 hover:border-fuchsia-500';
+        else if (holiday) cellClass += 'border-rose-200 bg-rose-50/70 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-50 hover:shadow-sm';
         else if (isSaturday) cellClass += 'border-sky-100 bg-sky-50/60 hover:-translate-y-0.5 hover:border-sky-300 hover:bg-sky-50 hover:shadow-sm';
         else if (isSunday) cellClass += 'border-rose-100 bg-rose-50/60 hover:-translate-y-0.5 hover:border-rose-300 hover:bg-rose-50 hover:shadow-sm';
         else cellClass += 'border-slate-100 bg-white hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50/40 hover:shadow-sm';
 
         cells += `
-          <button type="button" data-action="select-date" data-date="${dateKey}" ${inRange ? '' : 'disabled'} class="${cellClass}" title="${inRange ? (weekend ? `${dateLabel(dateKey)} / 休日 (Weekend / Off-Day)` : `${dateLabel(dateKey)} / 日直: ${escapeHtml(duty.effective ? duty.effective.name : '不在')}`) : dateKey}">
+          <button type="button" data-action="select-date" data-date="${dateKey}" ${inRange ? '' : 'disabled'} class="${cellClass}" title="${inRange ? (holiday ? `${dateLabel(dateKey)} / 祝日: ${escapeHtml(getHolidayName(dateKey))}` : weekend ? `${dateLabel(dateKey)} / 休日` : `${dateLabel(dateKey)} / 日直: ${escapeHtml(duty.effective ? duty.effective.name : '不在')}`) : dateKey}">
             <span class="flex w-full items-center justify-between">
-              <span class="text-[11px] font-extrabold ${isSelected ? 'text-indigo-700' : isToday ? 'text-fuchsia-600' : !inRange ? 'text-slate-300' : isSaturday ? 'text-sky-600' : isSunday ? 'text-rose-500' : 'text-slate-700'}">${day}</span>
-              ${inRange && !weekend && duty && duty.effective ? avatar(duty.effective, 'h-5 w-5', 'text-[7px]') : inRange && weekend ? '<span class="grid h-5 w-5 place-items-center rounded-lg bg-white/80 text-[9px] font-black text-slate-400 ring-1 ring-inset ring-slate-200">休</span>' : ''}
+              <span class="text-[11px] font-extrabold ${isSelected ? 'text-indigo-700' : isToday ? 'text-fuchsia-600' : !inRange ? 'text-slate-300' : holiday ? 'text-rose-500' : isSaturday ? 'text-sky-600' : isSunday ? 'text-rose-500' : 'text-slate-700'}">${day}</span>
+              ${inRange && !offDay && duty && duty.effective ? avatar(duty.effective, 'h-5 w-5', 'text-[7px]') : inRange && holiday ? '<span class="grid h-5 w-5 place-items-center rounded-lg bg-white/80 text-[9px] font-black text-rose-400 ring-1 ring-inset ring-rose-200">祝</span>' : inRange && weekend ? '<span class="grid h-5 w-5 place-items-center rounded-lg bg-white/80 text-[9px] font-black text-slate-400 ring-1 ring-inset ring-slate-200">休</span>' : ''}
             </span>
+            ${inRange && holiday ? '<span class="mt-1 rounded bg-rose-100 px-1 py-0.5 text-[8px] font-extrabold text-rose-600">祝日</span>' : ''}
             ${inRange && weekend ? '<span class="mt-1 rounded px-1 py-0.5 text-[8px] font-extrabold ' + (isSaturday ? 'bg-sky-100 text-sky-600' : 'bg-rose-100 text-rose-500') + '">休日</span>' : ''}
-            ${inRange && !weekend && personalStatus ? `<span class="mt-1 rounded px-1 py-0.5 text-[8px] font-extrabold ${statusClass}">${STATUS[personalStatus].label}</span>` : ''}
+            ${inRange && !offDay && entry ? `<span class="mt-1 rounded px-1 py-0.5 text-[8px] font-extrabold ${STATUS[entry.type].pill}">${compactLabel}</span>` : ''}
             ${inRange && isToday ? '<span class="absolute inset-x-1 bottom-0.5 text-[7px] font-extrabold uppercase tracking-wide text-fuchsia-500">TODAY</span>' : ''}
-            ${inRange && !weekend && duty && duty.shifted ? '<span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-400" title="日直交代"></span>' : ''}
+            ${inRange && !offDay && duty && duty.shifted ? '<span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-400" title="日直交代"></span>' : ''}
           </button>`;
       }
 
@@ -1624,24 +1859,37 @@
         `<div class="py-1 text-center text-[9px] font-extrabold uppercase tracking-wider ${index === 0 ? 'text-rose-400' : index === 6 ? 'text-sky-400' : 'text-slate-400'}">${label}</div>`
       ).join('');
 
-      const selectedWeekend = selectedDuty.isWeekend;
-      const statusButtons = ['present', 'absent', 'official'].map((statusKey) => {
+      const statusButtons = ['present', 'absent', 'official', 'late', 'early'].map((statusKey) => {
         const style = STATUS[statusKey];
-        const active = !selectedWeekend && myStatus === statusKey;
-        return `<button type="button" data-action="set-status" data-status="${statusKey}" aria-pressed="${active}" ${selectedWeekend ? 'disabled' : ''} class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-xs font-extrabold ring-1 ring-inset transition ${selectedWeekend ? 'cursor-not-allowed bg-slate-100 text-slate-300 ring-slate-200' : active ? style.onBtn : style.offBtn}">
-          <span>${style.label}</span><span class="text-[8px] font-bold opacity-70">${style.labelEn}</span>
+        const active = !selectedOffDay && myEntry.type === statusKey;
+        return `<button type="button" data-action="set-status" data-status="${statusKey}" aria-pressed="${active}" ${selectedOffDay ? 'disabled' : ''} class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-2.5 text-[11px] font-extrabold ring-1 ring-inset transition ${selectedOffDay ? 'cursor-not-allowed bg-slate-100 text-slate-300 ring-slate-200' : active ? style.onBtn : style.offBtn}">
+          <span>${style.label}</span><span class="text-[7px] font-bold opacity-70">${style.labelEn}</span>
         </button>`;
       }).join('');
 
-      const selectedLeaderBlock = selectedWeekend
-        ? `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-sky-100 text-sky-500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-sky-500">Weekend / Off-Day</p><p class="text-sm font-extrabold text-sky-700">休日 (Weekend / Off-Day)</p><p class="mt-0.5 text-[10px] font-medium text-slate-400">土日は日直なし・ローテーション凍結</p></div></div>`
+      const periodPanel = periodDraftType ? `
+        <div class="mt-3 rounded-xl border border-sky-200 bg-sky-50/80 p-3">
+          <p class="text-[11px] font-extrabold text-sky-800">${periodDraftType === 'late' ? '何時限から出席しますか？' : '何時限で早退しますか？'}</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <select id="periodSelect" class="rounded-lg border border-sky-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-sky-400">
+              ${PERIODS.map((p) => `<option value="${p.period}" ${p.period === periodDraftPeriod ? 'selected' : ''}>${p.period}時限 (${p.start}~${p.end})</option>`).join('')}
+            </select>
+            <button type="button" data-action="confirm-period-status" class="rounded-lg bg-sky-600 px-3 py-2 text-xs font-extrabold text-white transition hover:bg-sky-700">登録する</button>
+            <button type="button" data-action="cancel-period-status" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-slate-100">キャンセル</button>
+          </div>
+        </div>` : '';
+
+      const selectedLeaderBlock = selectedOffDay
+        ? selectedHoliday
+          ? `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-rose-100 text-rose-500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-rose-500">National Holiday</p><p class="text-sm font-extrabold text-rose-700">祝日 (National Holiday)</p><p class="mt-0.5 text-[10px] font-medium text-rose-500">${escapeHtml(getHolidayName(selectedDate))}</p></div></div>`
+          : `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-sky-100 text-sky-500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-sky-500">Weekend / Off-Day</p><p class="text-sm font-extrabold text-sky-700">休日 (Weekend / Off-Day)</p><p class="mt-0.5 text-[10px] font-medium text-slate-400">土日は日直なし・ローテーション凍結</p></div></div>`
         : selectedDuty.effective
         ? `<div class="flex items-center gap-2.5">
              ${avatar(selectedDuty.effective, 'h-10 w-10', 'text-xs')}
              <div class="min-w-0 flex-1">
-               <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">この日の日直</p>
+               <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">${selectedDuty.isLive ? '現在の時限の日直' : 'この日の日直'}</p>
                <p class="truncate text-sm font-extrabold text-slate-900">${escapeHtml(selectedDuty.effective.name)} ${currentStudent && selectedDuty.effective.id === currentStudent.id ? '<span class="rounded bg-indigo-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">あなた</span>' : ''}</p>
-               <p class="mt-0.5 text-[10px] font-medium ${selectedDuty.shifted ? 'text-amber-600' : 'text-slate-400'}">${selectedDuty.shifted ? `本来: ${escapeHtml(selectedDuty.designated.name)} → ${STATUS[selectedDuty.reason].label}で交代` : '指定ローテーション'}</p>
+               <p class="mt-0.5 text-[10px] font-medium ${selectedDuty.shifted ? 'text-amber-600' : 'text-slate-400'}">${selectedDuty.shifted ? `本来: ${escapeHtml(selectedDuty.designated.name)} → ${selectedDuty.isLive && selectedDuty.liveReason ? STATUS[selectedDuty.liveReason].label : STATUS[selectedDuty.reason] ? STATUS[selectedDuty.reason].label : '交代'}で交代` : '指定ローテーション'}</p>
              </div>
            </div>`
         : `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-rose-50 text-rose-500">${iconX('h-5 w-5')}</div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-rose-500">この日の日直</p><p class="text-sm font-extrabold text-rose-700">出席可能な日直がいません</p></div></div>`;
@@ -1663,11 +1911,13 @@
 
           <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-slate-50 px-3 py-2 text-[9px] font-bold text-slate-500">
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>出席</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-sky-500"></span>遅刻</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-violet-500"></span>早退</span>
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-500"></span>欠席</span>
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-500"></span>公欠</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-slate-300"></span>未登録</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-400"></span>祝日</span>
             <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-sky-400"></span>休日</span>
-            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-indigo-400"></span>アバター = その日の日直</span>
-            <span class="text-slate-400">日付を選択して自分の予定を登録</span>
           </div>
 
           <div class="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
@@ -1682,22 +1932,22 @@
           </div>
 
           <div class="mt-4">
-            <div class="mb-2 flex items-center justify-between">
+            <div class="mb-2 flex items-center justify-between gap-2">
               <div>
                 <p class="text-[11px] font-extrabold text-slate-600">自分の予定 / My plan</p>
                 <p class="mt-0.5 text-[10px] text-slate-400">${dateLabel(selectedDate)} のステータス</p>
               </div>
-              ${selectedWeekend ? '<span class="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-extrabold text-sky-600">休日 (Weekend / Off-Day)</span>' : statusPill(myStatus)}
+              ${selectedOffDay ? `<span class="rounded-full ${selectedHoliday ? 'bg-rose-100 text-rose-600' : 'bg-sky-100 text-sky-600'} px-2.5 py-1 text-[10px] font-extrabold">${selectedHoliday ? '祝日 (National Holiday)' : '休日 (Weekend / Off-Day)'}</span>` : statusPill(myEntry.type, myEntry.period)}
             </div>
-            <div class="grid grid-cols-3 gap-2">${statusButtons}</div>
-            <p class="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed ${selectedWeekend ? 'text-sky-600' : 'text-slate-400'}">
-              <span class="mt-0.5 shrink-0 ${selectedWeekend ? 'text-sky-400' : 'text-slate-300'}">${selectedWeekend ? iconCheck('h-3 w-3') : iconShield('h-3 w-3')}</span>
-              ${selectedWeekend ? '土曜・日曜は日直なし・ローテーション凍結です。平日を選択すると自分の予定を登録できます。' : '変更できるのは自分自身の予定だけです。欠席・公欠はその日の日直交代に即時反映されます。'}
+            <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">${statusButtons}</div>
+            ${periodPanel}
+            <p class="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed ${selectedOffDay ? 'text-slate-400' : 'text-slate-400'}">
+              <span class="mt-0.5 shrink-0 text-slate-300">${iconShield('h-3 w-3')}</span>
+              ${selectedOffDay ? '祝日・週末は授業と日直の対象外です。ステータス登録もできません。' : '変更できるのは自分自身の予定だけです。遅刻・早退は時限を指定して登録してください。'}
             </p>
           </div>
         </div>`;
     }
-
 
     /* ============================================================
        Render: live alerts
@@ -1782,31 +2032,32 @@
        Render: class status board
        ============================================================ */
     function renderClassBoard() {
-      const duty = computeDuty(selectedDate);
-      if (duty.isWeekend) {
+      const duty = getDisplayDuty(selectedDate);
+      if (duty.isOffDay) {
         document.getElementById('classBoard').innerHTML = `
           <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-6">
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-500">Class status board</p>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] ${duty.isHoliday ? 'text-rose-500' : 'text-sky-500'}">Class status board</p>
                 <h2 class="mt-0.5 text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">${dateLabel(selectedDate)}</h2>
               </div>
-              <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-extrabold text-sky-600">休日 (Weekend / Off-Day)</span>
+              <span class="inline-flex items-center gap-1 rounded-full ${duty.isHoliday ? 'bg-rose-100 text-rose-600' : 'bg-sky-100 text-sky-600'} px-2.5 py-1 text-[10px] font-extrabold">${duty.isHoliday ? '祝日 (National Holiday)' : '休日 (Weekend / Off-Day)'}</span>
             </div>
-            <div class="mt-4 rounded-2xl border border-sky-100 bg-sky-50/70 p-8 text-center">
-              <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white text-sky-500 shadow-sm ring-1 ring-inset ring-sky-100">
+            <div class="mt-4 rounded-2xl border ${duty.isHoliday ? 'border-rose-100 bg-rose-50/70' : 'border-sky-100 bg-sky-50/70'} p-8 text-center">
+              <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white ${duty.isHoliday ? 'text-rose-500 ring-rose-100' : 'text-sky-500 ring-sky-100'} shadow-sm ring-1 ring-inset">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-7 w-7"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
-              <p class="mt-3 text-sm font-extrabold text-sky-800">土曜・日曜は日直がありません</p>
-              <p class="mt-1 text-[11px] leading-relaxed text-sky-600">ローテーションは週末の間は凍結され、次の平日に前回の続きから再開します。ステータス登録も平日のみ可能です。</p>
+              <p class="mt-3 text-sm font-extrabold ${duty.isHoliday ? 'text-rose-800' : 'text-sky-800'}">${duty.isHoliday ? escapeHtml(duty.holidayName) : '土曜・日曜は日直がありません'}</p>
+              <p class="mt-1 text-[11px] leading-relaxed ${duty.isHoliday ? 'text-rose-600' : 'text-sky-600'}">祝日・週末は日直ローテーションが凍結され、次の学校平日に再開します。</p>
             </div>
           </div>`;
         return;
       }
+
       const cards = ROSTER.map((student) => {
-        const status = statusOf(selectedDate, student);
+        const entry = getStatusEntry(selectedDate, student);
         const isEffective = duty.effective && duty.effective.id === student.id;
-        const isDesignated = duty.designated.id === student.id;
+        const isDesignated = duty.designated && duty.designated.id === student.id;
         const isMe = currentStudent && currentStudent.id === student.id;
         return `
           <div class="relative flex items-center gap-3 rounded-2xl border p-3 transition ${isEffective ? 'border-indigo-300 bg-indigo-50/80 shadow-sm shadow-indigo-100' : 'border-slate-100 bg-white hover:bg-slate-50'}">
@@ -1815,19 +2066,16 @@
               <div class="flex flex-wrap items-center gap-1.5">
                 <p class="truncate text-xs font-extrabold text-slate-900">${escapeHtml(student.name)}</p>
                 ${isMe ? '<span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-extrabold text-indigo-600">YOU</span>' : ''}
-                ${isEffective ? '<span class="inline-flex items-center gap-0.5 rounded bg-indigo-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">' + iconCrown('h-2.5 w-2.5') + '日直</span>' : ''}
+                ${isEffective ? '<span class="inline-flex items-center gap-0.5 rounded bg-indigo-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">' + iconCrown('h-2.5 w-2.5') + (duty.isLive ? '現在の日直' : '日直') + '</span>' : ''}
                 ${isDesignated && !isEffective ? '<span class="rounded bg-slate-200 px-1.5 py-0.5 text-[8px] font-extrabold text-slate-500">本来</span>' : ''}
               </div>
               <p class="mt-1 text-[9px] font-medium text-slate-400">${student.code}</p>
             </div>
-            ${statusPill(status)}
+            ${statusPill(entry.type, entry.period)}
           </div>`;
       }).join('');
 
-      const presentCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'present').length;
-      const absentCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'absent').length;
-      const officialCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'official').length;
-
+      const count = (type) => ROSTER.filter((student) => getStatusEntry(selectedDate, student).type === type).length;
       document.getElementById('classBoard').innerHTML = `
         <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-6">
           <div class="flex flex-wrap items-start justify-between gap-3">
@@ -1837,22 +2085,23 @@
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
               <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-500">${iconLock('h-3 w-3')} 閲覧のみ</span>
-              ${duty.effective ? `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-extrabold text-indigo-600 ring-1 ring-inset ring-indigo-100">${iconCrown('h-3 w-3')} ${selectedDate === TODAY ? '本日の日直' : 'この日の日直'}: ${escapeHtml(duty.effective.name)}</span>` : '<span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-rose-600">日直不在</span>'}
+              ${duty.effective ? `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-extrabold text-indigo-600 ring-1 ring-inset ring-indigo-100">${iconCrown('h-3 w-3')} ${duty.isLive ? '現在の日直' : 'この日の日直'}: ${escapeHtml(duty.effective.name)}</span>` : '<span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-rose-600">日直不在</span>'}
             </div>
           </div>
 
           <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">${cards}</div>
 
-          <div class="mt-4 grid grid-cols-4 gap-2">
-            <div class="rounded-xl bg-emerald-50 px-2 py-2 text-center ring-1 ring-inset ring-emerald-100"><p class="text-base font-black text-emerald-600">${presentCount}</p><p class="text-[9px] font-bold text-emerald-700/70">出席</p></div>
-            <div class="rounded-xl bg-rose-50 px-2 py-2 text-center ring-1 ring-inset ring-rose-100"><p class="text-base font-black text-rose-600">${absentCount}</p><p class="text-[9px] font-bold text-rose-700/70">欠席</p></div>
-            <div class="rounded-xl bg-amber-50 px-2 py-2 text-center ring-1 ring-inset ring-amber-100"><p class="text-base font-black text-amber-600">${officialCount}</p><p class="text-[9px] font-bold text-amber-700/70">公欠</p></div>
-            <div class="rounded-xl bg-slate-50 px-2 py-2 text-center ring-1 ring-inset ring-slate-200"><p class="text-base font-black text-slate-500">${ROSTER.length}</p><p class="text-[9px] font-bold text-slate-400">対象者</p></div>
+          <div class="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+            <div class="rounded-xl bg-emerald-50 px-2 py-2 text-center ring-1 ring-inset ring-emerald-100"><p class="text-base font-black text-emerald-600">${count('present')}</p><p class="text-[9px] font-bold text-emerald-700/70">出席</p></div>
+            <div class="rounded-xl bg-sky-50 px-2 py-2 text-center ring-1 ring-inset ring-sky-100"><p class="text-base font-black text-sky-600">${count('late')}</p><p class="text-[9px] font-bold text-sky-700/70">遅刻</p></div>
+            <div class="rounded-xl bg-violet-50 px-2 py-2 text-center ring-1 ring-inset ring-violet-100"><p class="text-base font-black text-violet-600">${count('early')}</p><p class="text-[9px] font-bold text-violet-700/70">早退</p></div>
+            <div class="rounded-xl bg-rose-50 px-2 py-2 text-center ring-1 ring-inset ring-rose-100"><p class="text-base font-black text-rose-600">${count('absent')}</p><p class="text-[9px] font-bold text-rose-700/70">欠席</p></div>
+            <div class="rounded-xl bg-amber-50 px-2 py-2 text-center ring-1 ring-inset ring-amber-100"><p class="text-base font-black text-amber-600">${count('official')}</p><p class="text-[9px] font-bold text-amber-700/70">公欠</p></div>
+            <div class="rounded-xl bg-slate-50 px-2 py-2 text-center ring-1 ring-inset ring-slate-200"><p class="text-base font-black text-slate-500">${count('unregistered')}</p><p class="text-[9px] font-bold text-slate-400">未登録</p></div>
           </div>
-          <p class="mt-3 text-[10px] leading-relaxed text-slate-400">表示中の日付: ${dateLabel(selectedDate)}。カレンダーで日付を切り替えて、各日の日直とクラス状況を確認できます。</p>
+          <p class="mt-3 text-[10px] leading-relaxed text-slate-400">表示中の日付: ${dateLabel(selectedDate)}。${duty.isLive ? `現在の${duty.livePeriod}限の時間帯に基づく日直です。` : 'カレンダーで日付を切り替えて、各日の日直とクラス状況を確認できます。'}</p>
         </div>`;
     }
-
 
     /* ============================================================
        Render: account & permissions
@@ -1881,11 +2130,11 @@
             <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">Firestore</span><span class="font-bold ${cloudState === 'error' ? 'text-rose-500' : 'text-emerald-600'}">${cloudState === 'live' ? 'LIVE 同期中' : cloudState === 'error' ? '同期エラー' : '接続中'}</span></div>
             <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">予定登録可能期間</span><span class="font-bold text-slate-600">今日〜${shortDate(addDays(TODAY, MAX_PLAN_DAYS))}（平日）</span></div>
             <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">ローテーション起点</span><span class="font-bold text-slate-600">${shortDate(ROTATION_ANCHOR.date)} / ${escapeHtml(ROSTER[ROTATION_ANCHOR.index].name)}</span></div>
-            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">日直通知</span><span class="font-bold text-slate-600">${alertInfo ? `${alertInfo.alertTime}（${alertInfo.period}開始10分前）` : '週末のためなし'}</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">日直通知</span><span class="font-bold text-slate-600">${alertInfo ? `${alertInfo.alertTime}（${alertInfo.period}開始10分前）` : '休日・祝日のためなし'}</span></div>
             <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">通知権限</span><span class="font-bold ${notificationSupported() && Notification.permission === 'granted' ? 'text-emerald-600' : 'text-slate-500'}">${permissionLabel}</span></div>
           </div>
           <div class="mt-3 space-y-1.5 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
-            <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 自分の予定（出席・欠席・公欠）変更</p>
+            <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 自分の予定（出席・欠席・公欠・遅刻・早退）変更</p>
             <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 2ヶ月先までの日直スケジュール閲覧</p>
             <p class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">${iconLock('h-3 w-3')} 他生徒の予定・アカウント変更</p>
             <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 欠席・公欠時の日直自動交代</p>
@@ -1898,12 +2147,83 @@
     /* ============================================================
        Master render
        ============================================================ */
+    function getFirstPeriodNumber(dateKey) {
+      const blocks = TIMETABLE[parseKey(dateKey).getDay()] || [];
+      if (!blocks.length) return 1;
+      const match = String(blocks[0].label).match(/\d+/);
+      return match ? Number(match[0]) : 1;
+    }
+
+    function renderLiveBanner() {
+      const el = document.getElementById('liveBanner');
+      if (!el) return;
+      const now = new Date();
+      const timeText = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      const day = now.getDay();
+      const holiday = isHoliday(TODAY);
+      const weekend = isWeekend(TODAY);
+      const duty = getActiveDuty(TODAY);
+      const leaderText = duty.effective ? escapeHtml(duty.effective.name) : '不在';
+
+      if (weekend || holiday) {
+        el.innerHTML = `
+          <div class="flex flex-col gap-2 rounded-2xl border ${holiday ? 'border-rose-200 bg-rose-50/80' : 'border-sky-200 bg-sky-50/80'} p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <div class="grid h-10 w-10 place-items-center rounded-xl ${holiday ? 'bg-rose-100 text-rose-500' : 'bg-sky-100 text-sky-500'}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <p class="text-[9px] font-extrabold uppercase tracking-[0.18em] ${holiday ? 'text-rose-500' : 'text-sky-500'}">${holiday ? 'National Holiday' : 'Weekend / Off-Day'}</p>
+                <p class="text-sm font-extrabold ${holiday ? 'text-rose-800' : 'text-sky-800'}">${holiday ? `祝日 (National Holiday) — ${escapeHtml(getHolidayName(TODAY))}` : '休日 (Weekend / Off-Day)'}</p>
+                <p class="text-[10px] font-medium ${holiday ? 'text-rose-500' : 'text-sky-500'}">本日は授業・日直はありません。</p>
+              </div>
+            </div>
+            <span class="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-bold text-slate-500">${timeText}</span>
+          </div>`;
+        return;
+      }
+
+      const blocks = TIMETABLE[day] || [];
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const activeBlocks = blocks.filter((block) => nowMinutes >= timeToMinutes(block.start) && nowMinutes < timeToMinutes(block.end));
+      const nextBlock = blocks.find((block) => timeToMinutes(block.start) > nowMinutes);
+      let classHtml = '';
+      if (activeBlocks.length) {
+        classHtml = activeBlocks.map((block) => `<span class="text-sm font-black text-emerald-800">LIVE NOW: ${block.label} (${block.start}~${block.end}) - ${block.room}</span>`).join('<span class="mx-1 text-emerald-300">/</span>');
+      } else {
+        classHtml = `<span class="text-sm font-black text-slate-700">授業時間外</span>` +
+          (nextBlock ? `<span class="ml-2 text-[10px] font-bold text-slate-500">次の授業: ${nextBlock.label} (${nextBlock.start}~${nextBlock.end}) ${nextBlock.room}</span>` : '<span class="ml-2 text-[10px] font-bold text-slate-400">本日の授業は終了しました</span>');
+      }
+
+      el.innerHTML = `
+        <div class="rounded-2xl border ${activeBlocks.length ? 'border-emerald-200 bg-emerald-50/80' : 'border-slate-200 bg-white/80'} p-4 shadow-sm">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-start gap-3">
+              <div class="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl ${activeBlocks.length ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-400'}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2" stroke-linecap="round"/></svg>
+                ${activeBlocks.length ? '<span class="absolute -right-1 -top-1 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500 ring-2 ring-white"></span>' : ''}
+              </div>
+              <div>
+                <p class="text-[9px] font-extrabold uppercase tracking-[0.18em] ${activeBlocks.length ? 'text-emerald-600' : 'text-slate-400'}">Live class tracker</p>
+                <p class="mt-0.5">${classHtml}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 text-right">
+              <div><p class="text-[9px] font-bold uppercase tracking-wider text-slate-400">Now</p><p class="text-sm font-black text-slate-800">${timeText}</p></div>
+              <div class="h-8 w-px bg-slate-200"></div>
+              <div><p class="text-[9px] font-bold uppercase tracking-wider text-slate-400">日直</p><p class="max-w-[150px] truncate text-sm font-black text-indigo-600">${leaderText}${duty.isLive ? ` · ${duty.livePeriod}限` : ''}</p></div>
+            </div>
+          </div>
+        </div>`;
+    }
+
     function renderAll() {
       applyAuthUI();
       if (!firebaseUser || !currentStudent) return;
       renderCloudStatus();
       renderHeader();
       renderUserMenu();
+      renderLiveBanner();
       renderBanner();
       renderHero();
       renderAlerts();
@@ -1920,6 +2240,7 @@
       if (!ensureSession() || !dateKey || !isPlanDate(dateKey)) return;
       selectedDate = dateKey;
       calendarMonth = monthKeyOf(dateKey);
+      periodDraftType = null;
       renderBanner();
       renderScheduleCard();
       renderClassBoard();
@@ -1935,29 +2256,49 @@
       renderScheduleCard();
     }
 
-    async function setMyStatus(statusKey) {
+    async function setMyStatus(statusKey, period = null) {
       if (!ensureSession()) return;
-      if (!['present', 'absent', 'official'].includes(statusKey)) return;
+      if (!['present', 'absent', 'official', 'late', 'early'].includes(statusKey)) return;
       if (!isPlanDate(selectedDate)) {
         showToast('日付が範囲外です', '今日から60日先までの日付を選択してください。', 'error');
         return;
       }
-      if (isWeekend(selectedDate)) {
-        showToast('休日のため登録できません', '土曜・日曜は日直ローテーションとステータス登録の対象外です。', 'warning');
+      if (isOffDay(selectedDate)) {
+        showToast('休日のため登録できません', '土曜・日曜・祝日は日直ローテーションとステータス登録の対象外です。', 'warning');
         return;
       }
 
-      const previousStatus = statusOf(selectedDate, currentStudent);
-      if (previousStatus === statusKey) {
-        showToast('すでに登録済みです', `${dateLabel(selectedDate)} は「${STATUS[statusKey].label}」で登録されています。`, 'info');
+      if (statusKey === 'late' || statusKey === 'early') {
+        if (!period) {
+          periodDraftType = statusKey;
+          periodDraftPeriod = statusKey === 'late' ? 2 : 4;
+          renderScheduleCard();
+          return;
+        }
+        const parsedPeriod = Number(period);
+        if (!(parsedPeriod >= 1 && parsedPeriod <= 8)) {
+          showToast('時限が不正です', '1時限から8時限の間で選択してください。', 'error');
+          return;
+        }
+        period = parsedPeriod;
+      }
+
+      const previousEntry = getStatusEntry(selectedDate, currentStudent);
+      if (previousEntry.type === statusKey && (statusKey !== 'late' && statusKey !== 'early' ? true : previousEntry.period === period)) {
+        showToast('すでに登録済みです', `${dateLabel(selectedDate)} は「${statusLabel(statusKey, period)}」で登録されています。`, 'info');
+        periodDraftType = null;
         return;
       }
 
       const previousMap = { ...getStatusMap(selectedDate) };
       const before = computeDuty(selectedDate);
-      statuses[selectedDate] = { ...previousMap, [currentStudent.code]: statusKey };
+      const storedValue = statusKey === 'late' || statusKey === 'early'
+        ? { type: statusKey, period }
+        : statusKey;
+      statuses[selectedDate] = { ...previousMap, [currentStudent.code]: storedValue };
       rebuildDutyCache();
       const after = computeDuty(selectedDate);
+      periodDraftType = null;
       renderAll();
 
       try {
@@ -1969,20 +2310,20 @@
             : {};
           transaction.set(statusRef, {
             date: selectedDate,
-            statuses: { ...existing, [currentStudent.code]: statusKey },
+            statuses: { ...existing, [currentStudent.code]: storedValue },
             updatedAt: serverTimestamp(),
             updatedBy: firebaseUser.uid
           }, { merge: true });
         });
 
         let alert = null;
-        if (statusKey === 'absent' || statusKey === 'official') {
-          alert = await publishStatusAlert(currentStudent, statusKey, selectedDate, before, after);
+        if (['absent', 'official', 'late', 'early'].includes(statusKey)) {
+          alert = await publishStatusAlert(currentStudent, statusKey, period, selectedDate, before, after);
         }
         renderAll();
         showToast(
           'ステータスを更新しました',
-          alert && alert.messageJa ? alert.messageJa : `${dateLabel(selectedDate)} を「${STATUS[statusKey].label}」に設定しました。`,
+          alert && alert.messageJa ? alert.messageJa : `${dateLabel(selectedDate)} を「${statusLabel(statusKey, period)}」に設定しました。`,
           statusKey === 'present' ? 'success' : 'warning'
         );
       } catch (err) {
@@ -2017,6 +2358,16 @@
         switch (trigger.dataset.action) {
           case 'auth-tab': switchAuthTab(trigger.dataset.tab); break;
           case 'set-status': setMyStatus(trigger.dataset.status); break;
+          case 'confirm-period-status': {
+            const select = document.getElementById('periodSelect');
+            const period = select ? Number(select.value) : periodDraftPeriod;
+            setMyStatus(periodDraftType, period);
+            break;
+          }
+          case 'cancel-period-status':
+            periodDraftType = null;
+            renderScheduleCard();
+            break;
           case 'select-date': selectDate(trigger.dataset.date); break;
           case 'calendar-prev': changeCalendarMonth(-1); break;
           case 'calendar-next': changeCalendarMonth(1); break;
@@ -2100,6 +2451,18 @@
       checkRemoteAppVersion();
     }, 5 * 60 * 1000);
 
+    setInterval(() => {
+      if (!firebaseUser || !currentStudent) return;
+      renderLiveBanner();
+      renderHero();
+      renderBanner();
+      renderHeader();
+      renderClassBoard();
+      if (!periodDraftType) renderScheduleCard();
+    }, 30 * 1000);
+
+    loadJapaneseHolidays();
+
     initVersionCheck();
 
     /* ============================================================
@@ -2141,7 +2504,7 @@
       setLoginNotice('');
       // Show the required initial state immediately; Firestore snapshots replace it with live data.
       if (ROTATION_ANCHOR.date === TODAY && !statuses[TODAY]) {
-        statuses[TODAY] = { '2608006': 'absent', '2608005': 'official' };
+        statuses[TODAY] = { '2608006': 'absent', '2608005': 'official', '2608001': 'present' };
         rebuildDutyCache();
       }
       applyAuthUI();
