@@ -297,8 +297,8 @@
       setPersistence, browserSessionPersistence
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
     import {
-      getFirestore, collection, doc, query, where, orderBy, limit,
-      onSnapshot, addDoc, getDoc, setDoc, runTransaction, serverTimestamp
+      getFirestore, collection, doc, query, where,
+      onSnapshot, getDoc, setDoc, runTransaction, serverTimestamp
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
     const firebaseConfig = {
@@ -778,16 +778,20 @@
       for (let step = 0; step < ROSTER.length; step += 1) {
         const student = ROSTER[(start + step) % ROSTER.length];
         if (student.code === duty.effective.code) break;
-        const status = statusOf(duty.date, student);
-        if (status === 'absent' || status === 'official') skipped.push({ student, status });
+        const entry = getStatusEntry(duty.date, student);
+        if (['absent', 'official', 'late', 'early'].includes(entry.type)) {
+          skipped.push({ student, entry });
+        }
       }
       if (!skipped.length) return null;
-      const parts = skipped.map((item) => `(${item.student.name}) が${STATUS[item.status].label}`);
+      const prefix = duty.date === TODAY ? '本日' : dateLabel(duty.date);
+      const parts = skipped.map((item) => `(${item.student.name}) が${statusLabel(item.entry.type, item.entry.period)}`);
       const lead = parts.length === 1
-        ? `本日の予定日直 ${parts[0]}`
-        : `本日の予定日直 ${parts[0]}、および ${parts.slice(1).join('、')}`;
-      const messageJa = `⚠️ ${lead}のため、本日の日直は ${duty.effective.name} さんに交代しました。`;
-      const messageEn = `⚠️ Today's scheduled leader ${duty.designated.name} is unavailable due to ${skipped.map((item) => STATUS[item.status].labelEn).join(' / ')}. One Day Leader duty transferred to ${duty.effective.name}.`;
+        ? `${prefix}の予定日直 ${parts[0]}`
+        : `${prefix}の予定日直 ${parts[0]}、および ${parts.slice(1).join('、')}`;
+      const periodNote = duty.timeAware && duty.livePeriod ? `（${duty.livePeriod}限の時間帯）` : '';
+      const messageJa = `⚠️ ${lead}のため、${prefix}の日直は ${duty.effective.name} さんに交代しました。${periodNote}`;
+      const messageEn = `⚠️ ${duty.date === TODAY ? "Today's" : dateLabel(duty.date) + "'s"} scheduled leader ${duty.designated.name} is unavailable. One Day Leader duty transferred to ${duty.effective.name}.`;
       return { messageJa, messageEn };
     }
 
@@ -827,7 +831,6 @@
        Cloud / auth state
        ============================================================ */
     let statuses = {};
-    let alerts = [];
     let JAPAN_HOLIDAYS = {};
     let holidaysLoaded = false;
     let holidayFetchPromise = null;
@@ -847,8 +850,6 @@
     let cloudError = '';
     let cloudUnsubs = [];
     let statusSnapshotReady = false;
-    let alertsSnapshotReady = false;
-    let lastAlertId = null;
     let anchorSynced = false;
     let authAnnouncementTimer = null;
 
@@ -1086,8 +1087,6 @@
       });
       cloudUnsubs = [];
       statusSnapshotReady = false;
-      alertsSnapshotReady = false;
-      lastAlertId = null;
     }
 
     function maybeAnnounceLeader() {
@@ -1196,27 +1195,6 @@
         cloudUnsubs.push(unsubStatuses);
       } catch (err) {
         handleCloudError('status listener', err);
-      }
-
-      try {
-        const alertsQuery = query(collection(db, 'alerts'), orderBy('createdAt', 'desc'), limit(30));
-        const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
-          const list = snapshot.docs.map((document) => { const data = document.data(); return { id: document.id, ...data, at: data.createdAt || null }; });
-          const latest = list[0] || null;
-          if (alertsSnapshotReady && latest && latest.id !== lastAlertId) {
-            if (!currentStudent || latest.reporterCode !== currentStudent.code) {
-              showToast('クラス通知', latest.messageJa || '', latest.type === 'fallback' ? 'warning' : 'info');
-              sendBrowserNotification('One Day Leader', latest.messageEn || latest.messageJa || '', `odl-alert-${latest.id}`);
-            }
-          }
-          alerts = list;
-          lastAlertId = latest ? latest.id : null;
-          alertsSnapshotReady = true;
-          renderAlerts();
-        }, (err) => handleCloudError('alert listener', err));
-        cloudUnsubs.push(unsubAlerts);
-      } catch (err) {
-        handleCloudError('alert listener', err);
       }
     }
 
@@ -1566,49 +1544,6 @@
     /* ============================================================
        Runtime alerts
        ============================================================ */
-    async function publishStatusAlert(student, status, period, dateKey, before, after) {
-      const label = statusLabel(status, period);
-      const labelEn = status === 'late' && period
-        ? `Late Arrival from period ${period}`
-        : status === 'early' && period
-          ? `Early Leave from period ${period}`
-          : STATUS[status].labelEn;
-      const transferred = (before.effective ? before.effective.code : null) !== (after.effective ? after.effective.code : null);
-      const toName = after.effective ? after.effective.name : null;
-
-      const messageJa = `${student.name} さんが ${dateLabel(dateKey)} を「${label}」で登録しました。` +
-        (transferred
-          ? (toName ? ` 日直が ${toName} さんに交代しました。` : ' 日直を務められる出席者がいなくなりました。')
-          : '');
-      const messageEn = `${student.name} marked ${labelEn} for ${dateKey}.` +
-        (transferred
-          ? (toName ? ` One Day Leader duty transferred to ${toName}!` : ' No available leader remains.')
-          : '');
-
-      const payload = {
-        date: dateKey,
-        type: transferred ? 'fallback' : 'status',
-        priority: transferred ? 'high' : 'normal',
-        status,
-        period: period || null,
-        reporterCode: student.code,
-        reporterName: student.name,
-        fromLeaderCode: before.effective ? before.effective.code : null,
-        fromLeaderName: before.effective ? before.effective.name : '担当者なし',
-        toLeaderCode: after.effective ? after.effective.code : null,
-        toLeaderName: toName,
-        messageJa,
-        messageEn
-      };
-
-      try {
-        await addDoc(collection(db, 'alerts'), { ...payload, createdAt: serverTimestamp() });
-      } catch (err) {
-        handleCloudError('alert write', err);
-      }
-      return payload;
-    }
-
     /* ============================================================
        Render: active leader banner
        ============================================================ */
@@ -1921,79 +1856,93 @@
     /* ============================================================
        Render: live alerts
        ============================================================ */
+    function buildCurrentAlertItem(dateKey, duty) {
+      const prefix = dateKey === TODAY ? '本日' : dateLabel(dateKey);
+      if (duty.isOffDay) {
+        return {
+          kind: 'off',
+          title: duty.isHoliday ? '祝日 (National Holiday)' : '休日 (Weekend / Off-Day)',
+          messageJa: duty.isHoliday
+            ? `${prefix}は祝日「${getHolidayName(dateKey)}」のため、日直はありません。`
+            : `${prefix}は休日のため、日直はありません。`,
+          messageEn: `${dateKey} is an off-day. No One Day Leader is assigned.`
+        };
+      }
+      if (!duty.effective) {
+        return {
+          kind: 'danger',
+          title: '日直不在',
+          messageJa: `${prefix}の日直を務められる出席者がいません。`,
+          messageEn: `No available One Day Leader remains for ${dateKey}.`
+        };
+      }
+      const shift = buildShiftNotice(duty);
+      if (shift) {
+        return { kind: 'warning', title: '日直交代', ...shift };
+      }
+      return {
+        kind: 'normal',
+        title: '日直は正常に割り当てられています',
+        messageJa: `${prefix}の日直は ${duty.effective.name} さんです。`,
+        messageEn: `${dateKey}'s One Day Leader is ${duty.effective.name}.`
+      };
+    }
+
     function renderAlerts() {
-      const todayDuty = computeDuty(TODAY);
-      const shift = buildShiftNotice(todayDuty);
-      const derived = shift ? {
-        id: 'derived-today-shift',
-        date: TODAY,
-        at: new Date().toISOString(),
-        type: 'fallback',
-        priority: 'high',
-        messageJa: shift.messageJa,
-        messageEn: shift.messageEn
-      } : null;
-      const combined = [
-        ...(derived ? [derived] : []),
-        ...alerts.filter((a) => !derived || a.date !== TODAY)
-      ];
+      const selectedDuty = getDisplayDuty(selectedDate);
+      const todayDuty = getActiveDuty(TODAY);
+      const selectedItem = buildCurrentAlertItem(selectedDate, selectedDuty);
+      const todayItem = buildCurrentAlertItem(TODAY, todayDuty);
+      const warnings = (selectedDate === TODAY ? [selectedItem] : [selectedItem, todayItem])
+        .filter((item) => item.kind === 'warning' || item.kind === 'danger');
       const feed = document.getElementById('alertFeed');
 
-      if (!combined.length) {
+      if (!warnings.length) {
         feed.classList.add('hidden');
         feed.innerHTML = '';
       } else {
         feed.classList.remove('hidden');
-        feed.innerHTML = combined.slice(0, 2).map((alert) => {
-          const isTransfer = alert.type === 'fallback';
+        feed.innerHTML = warnings.slice(0, 2).map((item) => {
+          const isDanger = item.kind === 'danger';
           return `
-            <div role="alert" class="flex items-start gap-3 rounded-2xl border ${isTransfer ? 'border-rose-200 bg-gradient-to-r from-rose-50 to-amber-50 shadow-rose-100/60' : 'border-amber-200 bg-amber-50/80 shadow-amber-100/60'} p-4 shadow-lg">
-              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isTransfer ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}">
+            <div role="alert" class="flex items-start gap-3 rounded-2xl border ${isDanger ? 'border-rose-300 bg-rose-50' : 'border-rose-200 bg-gradient-to-r from-rose-50 to-amber-50'} p-4 shadow-lg shadow-rose-100/60">
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-rose-100 text-rose-600">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-5 w-5"><path d="M12 8v5M12 16h.01M10.3 4.3 2.8 17.5A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.5L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-2">
-                  <p class="text-[9px] font-extrabold uppercase tracking-[0.18em] ${isTransfer ? 'text-rose-500' : 'text-amber-600'}">Class-wide alert</p>
-                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-slate-500">${dateLabel(alert.date)}</span>
-                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-slate-500">${timeLabel(alert.at)}</span>
-                  ${alert.priority === 'high' ? '<span class="rounded-full bg-rose-600 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider text-white">high priority</span>' : ''}
+                  <p class="text-[9px] font-extrabold uppercase tracking-[0.18em] text-rose-500">Current class alert</p>
+                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-slate-500">${selectedItem === item ? (selectedDate === TODAY ? 'TODAY' : 'SELECTED') : 'TODAY'}</span>
+                  <span class="rounded-full bg-rose-600 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider text-white">live state</span>
                 </div>
-                <p class="mt-1 text-sm font-extrabold leading-relaxed ${isTransfer ? 'text-rose-900' : 'text-amber-900'}">${escapeHtml(alert.messageJa)}</p>
-                <p class="mt-1 text-[10px] font-medium text-slate-500">${escapeHtml(alert.messageEn)}</p>
+                <p class="mt-1 text-sm font-extrabold leading-relaxed text-rose-900">${escapeHtml(item.messageJa)}</p>
+                <p class="mt-1 text-[10px] font-medium text-slate-500">${escapeHtml(item.messageEn)}</p>
               </div>
             </div>`;
         }).join('');
       }
 
+      const cardItems = selectedDate === TODAY ? [selectedItem] : [selectedItem, todayItem];
       const card = document.getElementById('alertsCard');
-      if (!combined.length) {
-        card.innerHTML = `
-          <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50">
-            ${cardHeader('Live alerts', 'クラス通知', '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-500">0 件</span>')}
-            <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4 text-center">
-              <p class="text-xs font-extrabold text-slate-600">通知はまだありません</p>
-              <p class="mt-1 text-[10px] leading-relaxed text-slate-400">欠席・公欠の登録や日直交代が発生すると、ここにクラス全体のアラートが表示されます。</p>
-            </div>
-          </div>`;
-        return;
-      }
-
       card.innerHTML = `
         <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50">
-          ${cardHeader('Live alerts', 'クラス通知', `<span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-rose-600">${combined.length} 件</span>`)}
-          <div class="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
-            ${combined.slice(0, 24).map((alert) => {
-              const isTransfer = alert.type === 'fallback';
+          ${cardHeader('Live alerts', '現在のクラス通知', '<span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-600"><span class="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>REALTIME</span>')}
+          <div class="mt-3 space-y-2">
+            ${cardItems.map((item) => {
+              const isWarning = item.kind === 'warning' || item.kind === 'danger';
+              const isOff = item.kind === 'off';
               return `
-                <div class="rounded-xl border ${isTransfer ? 'border-rose-100 bg-rose-50/60' : 'border-amber-100 bg-amber-50/60'} p-2.5">
+                <div class="rounded-xl border p-3 ${isWarning ? 'border-rose-100 bg-rose-50/60' : isOff ? 'border-sky-100 bg-sky-50/60' : 'border-emerald-100 bg-emerald-50/50'}">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="text-[9px] font-extrabold ${isTransfer ? 'text-rose-500' : 'text-amber-600'}">${isTransfer ? '日直交代' : 'ステータス更新'} · ${shortDate(alert.date)}</span>
-                    <span class="text-[9px] font-medium text-slate-400">${timeLabel(alert.at)}</span>
+                    <span class="text-[9px] font-extrabold ${isWarning ? 'text-rose-500' : isOff ? 'text-sky-600' : 'text-emerald-600'}">${item.title}</span>
+                    <span class="rounded bg-white/70 px-1.5 py-0.5 text-[8px] font-bold text-slate-400">${selectedDate === TODAY ? 'TODAY' : (item === selectedItem ? 'SELECTED' : 'TODAY')}</span>
                   </div>
-                  <p class="mt-1 text-[10px] font-semibold leading-relaxed text-slate-600">${escapeHtml(alert.messageJa)}</p>
+                  <p class="mt-1 text-[10px] font-semibold leading-relaxed text-slate-600">${escapeHtml(item.messageJa)}</p>
+                  <p class="mt-1 text-[9px] leading-relaxed text-slate-400">${escapeHtml(item.messageEn)}</p>
                 </div>`;
             }).join('')}
           </div>
+          <p class="mt-2 text-[9px] leading-relaxed text-slate-400">このパネルは現在のFirestore状態のみを表示します。過去の通知履歴は保持しません。</p>
         </div>`;
     }
 
@@ -2285,14 +2234,10 @@
           }, { merge: true });
         });
 
-        let alert = null;
-        if (['absent', 'official', 'late', 'early'].includes(statusKey)) {
-          alert = await publishStatusAlert(currentStudent, statusKey, period, selectedDate, before, after);
-        }
         renderAll();
         showToast(
           'ステータスを更新しました',
-          alert && alert.messageJa ? alert.messageJa : `${dateLabel(selectedDate)} を「${statusLabel(statusKey, period)}」に設定しました。`,
+          `${dateLabel(selectedDate)} を「${statusLabel(statusKey, period)}」に設定しました。`,
           statusKey === 'present' ? 'success' : 'warning'
         );
       } catch (err) {
@@ -2445,7 +2390,6 @@
         currentStudent = null;
         session = null;
         statuses = {};
-        alerts = [];
         dutyCache = {};
         cloudState = 'idle';
         cloudError = '';

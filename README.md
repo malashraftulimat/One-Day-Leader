@@ -31,7 +31,7 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
   - Base: 鈴木 斗和 — 欠席
   - Next: 小林 大輝 — 公欠
   - Active: 吉田 瑛都
-- Live alert banner and Firestore-backed class alert feed when a status update changes the leader.
+- Reactive class alert banner and Live Alerts panel derived only from the current Firestore status state. Historical alert logs are not stored or displayed.
 - Scheduled browser notification at 10 minutes before the first class:
   - Mon / Wed / Thu: 09:00
   - Tue: 11:00
