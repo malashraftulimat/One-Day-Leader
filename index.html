@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>One Day Leader | 日直ローテーション管理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Noto Sans JP', ui-sans-serif, system-ui, -apple-system, sans-serif; overflow-x: hidden; }
+    .blob { position: fixed; z-index: 0; border-radius: 9999px; filter: blur(90px); opacity: .35; pointer-events: none; }
+    .fade-up { animation: fadeUp .45s cubic-bezier(.22,1,.36,1) both; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .toast-enter { animation: toastIn .35s cubic-bezier(.22,1,.36,1) both; }
+    .toast-leave { animation: toastOut .25s ease forwards; }
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(18px) scale(.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toastOut { to { opacity: 0; transform: translateY(10px) scale(.98); } }
+    .pulse-ring { animation: pulseRing 2.4s ease-in-out infinite; }
+    @keyframes pulseRing {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(129,140,248,.45); }
+      50% { box-shadow: 0 0 0 12px rgba(129,140,248,0); }
+    }
+    .spin-slow { animation: spin 18s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .topic-row { animation: fadeUp .25s ease both; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 antialiased selection:bg-indigo-200/60">
+
+  <!-- ============================================================
+       AUTH VIEW
+       ============================================================ -->
+  <div id="authView" class="relative min-h-screen overflow-hidden bg-slate-950">
+    <div class="blob" style="width:440px;height:440px;top:-150px;left:-120px;background:#4f46e5;opacity:.45;"></div>
+    <div class="blob" style="width:420px;height:420px;bottom:-150px;right:-120px;background:#c026d3;opacity:.35;"></div>
+    <div class="blob" style="width:300px;height:300px;top:40%;left:45%;background:#0ea5e9;opacity:.2;"></div>
+
+    <div class="relative z-10 mx-auto grid min-h-screen max-w-6xl lg:grid-cols-[1.05fr_.95fr]">
+      <!-- Brand side -->
+      <section class="hidden flex-col justify-between p-10 text-white lg:flex xl:p-14">
+        <div>
+          <div class="flex items-center gap-3">
+            <div class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-lg shadow-indigo-900/40">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6" aria-hidden="true"><path d="M4 19V7l4 3 4-6 4 6 4-3v12" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <p class="text-lg font-black tracking-tight">One Day Leader</p>
+              <p class="text-[11px] font-semibold tracking-[0.18em] text-indigo-200/70">TECHNOS CLOUD · CLASS 10</p>
+            </div>
+          </div>
+
+          <div class="mt-16 max-w-lg">
+            <p class="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.18em] text-indigo-200 backdrop-blur">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Whitelist student portal
+            </p>
+            <h1 class="mt-5 text-4xl font-black leading-tight tracking-tight xl:text-5xl">
+              日直を、もっと<br />
+              <span class="bg-gradient-to-r from-indigo-300 via-violet-300 to-fuchsia-300 bg-clip-text text-transparent">自動で、安全に。</span>
+            </h1>
+            <p class="mt-4 text-sm leading-relaxed text-slate-300/80">
+              10名のホワイトリスト登録メンバーだけが利用できる日直管理ポータル。欠席時は次の出席者へ自動で交代します。
+            </p>
+          </div>
+
+          <div class="mt-10 space-y-3">
+            <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-3.5 backdrop-blur">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-400/15 text-emerald-300">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M12 3l7 3v6c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6l7-3Z" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <p class="text-xs font-extrabold">ホワイトリスト認証</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">学籍番号・氏名・学校メールが一致する10名のみ初期登録できます。</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-3.5 backdrop-blur">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-400/15 text-amber-300">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M12 8v4M12 16h.01" stroke-linecap="round"/><path d="M10.3 4.3 2.8 17.5A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.5L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div>
+                <p class="text-xs font-extrabold">欠席時の自動フォールバック</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">担当者が欠席を報告すると、次の出席者へ即座に交代します。</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[.04] p-3.5 backdrop-blur">
+              <div class="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-fuchsia-400/15 text-fuchsia-300">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18" stroke-linecap="round"/></svg>
+              </div>
+              <div>
+                <p class="text-xs font-extrabold">2ヶ月先までの予定カレンダー</p>
+                <p class="mt-0.5 text-[11px] text-slate-400">出席・欠席・公欠を事前登録し、日直の交代をリアルタイムで確認できます。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-10 rounded-2xl border border-white/10 bg-white/[.03] px-4 py-3 text-[10px] leading-relaxed text-slate-400">
+          <span class="font-bold text-slate-300">Whitelist:</span> 狩野・鈴木・小林・吉田・降旗・M ALASHRAF TOLIMAT・仲村・森田・田名網・佐藤
+        </div>
+      </section>
+
+      <!-- Auth card side -->
+      <section class="flex items-center justify-center px-4 py-8 sm:px-8">
+        <div class="w-full max-w-md">
+          <div class="mb-5 flex items-center gap-3 lg:hidden">
+            <div class="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-lg shadow-indigo-900/40">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5 text-white" aria-hidden="true"><path d="M4 19V7l4 3 4-6 4 6 4-3v12" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
+            </div>
+            <div class="text-white">
+              <p class="text-sm font-black">One Day Leader</p>
+              <p class="text-[10px] font-semibold tracking-wider text-indigo-200/70">TECHNOS CLOUD · CLASS 10</p>
+            </div>
+          </div>
+
+          <div class="rounded-3xl border border-white/10 bg-white p-5 shadow-2xl shadow-black/30 sm:p-7">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-indigo-500">Student portal</p>
+                <h2 class="mt-1 text-xl font-black tracking-tight text-slate-900">学籍アカウント</h2>
+                <p class="mt-1 text-[11px] leading-relaxed text-slate-500">ログイン、または初回パスワードを設定してください。</p>
+              </div>
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-indigo-50 text-indigo-500 ring-1 ring-inset ring-indigo-100">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5"><path d="M12 3l7 3v6c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6l7-3Z" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1" role="tablist" aria-label="認証方法">
+              <button id="authTabSignin" type="button" role="tab" data-action="auth-tab" data-tab="signin" aria-selected="true" class="rounded-lg bg-white px-2 py-2 text-[11px] font-extrabold text-indigo-700 shadow-sm transition">ログイン / Sign In</button>
+              <button id="authTabSignup" type="button" role="tab" data-action="auth-tab" data-tab="signup" aria-selected="false" class="rounded-lg px-2 py-2 text-[11px] font-extrabold text-slate-500 transition hover:text-slate-800">新規登録 / Sign Up</button>
+            </div>
+
+            <div id="loginNotice" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-amber-800"></div>
+
+            <!-- Sign In -->
+            <div id="signinPanel" class="mt-4">
+              <div id="loginError" role="alert" class="mb-4 hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-rose-700"></div>
+              <form id="loginForm" class="space-y-4" novalidate>
+                <div>
+                  <label for="loginId" class="mb-1.5 block text-[11px] font-extrabold text-slate-600">学籍番号 / 学校メール</label>
+                  <div class="relative">
+                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0" stroke-linecap="round"/></svg></span>
+                    <input id="loginId" type="text" inputmode="email" autocomplete="username" placeholder="例：2699999 または 2699999@technos.cloud"
+                      class="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-3 pl-10 pr-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                  </div>
+                </div>
+                <div>
+                  <div class="mb-1.5 flex items-center justify-between">
+                    <label for="loginPassword" class="block text-[11px] font-extrabold text-slate-600">パスワード</label>
+                    <button type="button" id="togglePassBtn" data-action="toggle-password" class="rounded px-1 text-[10px] font-bold text-indigo-500 transition hover:text-indigo-700">表示</button>
+                  </div>
+                  <div class="relative">
+                    <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 1 1 8 0v3" stroke-linecap="round"/></svg></span>
+                    <input id="loginPassword" type="password" autocomplete="current-password" placeholder="設定したパスワード"
+                      class="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-3 pl-10 pr-3 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                  </div>
+                </div>
+                <button id="loginSubmit" type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-indigo-300/50 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-4 w-4"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span id="loginSubmitLabel">ログイン</span>
+                </button>
+              </form>
+              <p class="mt-3 text-[10px] leading-relaxed text-slate-400">初回利用の方は「新規登録 / Sign Up」タブからパスワードを設定してください。</p>
+            </div>
+
+            <!-- Sign Up -->
+            <div id="signupPanel" class="mt-4 hidden">
+              <div id="signupError" role="alert" class="mb-4 hidden rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-rose-700"></div>
+              <form id="signupForm" class="space-y-3.5" novalidate>
+                <div>
+                  <label for="signupName" class="mb-1.5 block text-[11px] font-extrabold text-slate-600">氏名 / Full Name</label>
+                  <input id="signupName" type="text" autocomplete="name" placeholder="例：山田 太郎"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label for="signupId" class="mb-1.5 block text-[11px] font-extrabold text-slate-600">学籍番号（7桁）</label>
+                    <input id="signupId" type="text" inputmode="numeric" maxlength="7" placeholder="例：2699999"
+                      class="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                  </div>
+                  <div>
+                    <label for="signupPassword" class="mb-1.5 block text-[11px] font-extrabold text-slate-600">パスワード（8文字以上）</label>
+                    <input id="signupPassword" type="password" autocomplete="new-password" placeholder="8文字以上"
+                      class="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                  </div>
+                </div>
+                <div>
+                  <label for="signupEmail" class="mb-1.5 block text-[11px] font-extrabold text-slate-600">学校メール（@technos.cloud）</label>
+                  <input id="signupEmail" type="email" inputmode="email" autocomplete="email" placeholder="例：学籍番号@technos.cloud"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none transition placeholder:font-medium placeholder:text-slate-300 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-100" />
+                </div>
+                <button id="signupSubmit" type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 px-4 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-300/50 transition hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-4 w-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6" stroke-linecap="round"/></svg>
+                  <span id="signupSubmitLabel">アカウントを作成</span>
+                </button>
+              </form>
+              <div class="mt-3 rounded-xl border border-indigo-100 bg-indigo-50/70 p-3 text-[10px] leading-relaxed text-indigo-700">
+                氏名・学籍番号・メールアドレスがホワイトリストと完全一致した場合のみ登録できます。登録後は設定したパスワードでサインインしてください。
+              </div>
+            </div>
+          </div>
+
+          <div id="authRosterStatus" class="mt-3 rounded-2xl border border-white/10 bg-white/[.05] p-3.5 text-white backdrop-blur"></div>
+
+          <p class="mt-3 text-center text-[10px] leading-relaxed text-slate-500">
+            Firebase Authentication と Cloud Firestore によるリアルタイム同期。ホワイトリストの10名のみ登録できます。
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       APP VIEW
+       ============================================================ -->
+  <div id="appView" class="hidden">
+    <div class="blob" style="width:420px;height:420px;top:-140px;left:-100px;background:#c7d2fe;"></div>
+    <div class="blob" style="width:380px;height:380px;top:260px;right:-140px;background:#f5d0fe;"></div>
+    <div class="blob" style="width:320px;height:320px;bottom:-100px;left:35%;background:#bae6fd;"></div>
+
+    <header class="sticky top-0 z-30 border-b border-white/70 bg-white/80 backdrop-blur-xl">
+      <div class="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6">
+        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-lg shadow-indigo-200">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-5 w-5" aria-hidden="true"><path d="M4 19V7l4 3 4-6 4 6 4-3v12" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" stroke-linecap="round"/></svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <h1 class="truncate text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">One Day Leader</h1>
+          <p class="truncate text-[11px] font-medium text-slate-500">日直ローテーション・ポータル</p>
+        </div>
+        <div class="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <span id="cloudStatus" class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-1 text-[9px] font-extrabold text-slate-400"></span>
+          <span id="headerLeaderChip" class="hidden xl:inline-flex"></span>
+          <button id="notifBtn" type="button" data-action="request-notify" aria-label="ブラウザ通知を設定" class="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4" aria-hidden="true"><path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V10a6 6 0 1 0-12 0v4.2a2 2 0 0 1-.6 1.4L4 17h5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 17a3 3 0 0 0 6 0" stroke-linecap="round"/></svg>
+            <span id="notifLabel" class="hidden sm:inline">通知をON</span>
+          </button>
+          <div class="relative">
+            <button id="userMenuBtn" type="button" data-action="toggle-user-menu" aria-haspopup="menu" aria-expanded="false" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-2.5 text-left shadow-sm transition hover:border-indigo-200">
+              <span id="headerAvatar"></span>
+              <span class="hidden min-w-0 sm:block">
+                <span id="headerName" class="block max-w-[110px] truncate text-[11px] font-extrabold text-slate-800"></span>
+                <span class="block text-[9px] font-semibold text-slate-400">ログイン中</span>
+              </span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-3.5 w-3.5 text-slate-400" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div id="userMenuPanel" class="absolute right-0 top-[calc(100%+8px)] hidden w-[286px] origin-top-right rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-300/40"></div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6 sm:py-7">
+      <section id="myBanner" class="hidden"></section>
+      <section id="todayHero" class="fade-up"></section>
+      <section id="alertFeed" class="hidden"></section>
+
+      <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div class="space-y-5 lg:col-span-2">
+          <section id="scheduleCard" class="fade-up"></section>
+          <section id="classBoard" class="fade-up"></section>
+        </div>
+        <aside class="space-y-5">
+          <section id="alertsCard" class="fade-up"></section>
+          <section id="securityCard" class="fade-up"></section>
+        </aside>
+      </div>
+
+      <footer class="flex flex-col items-center justify-between gap-2 py-6 text-[11px] text-slate-400 sm:flex-row">
+        <p>One Day Leader · 10名ホワイトリスト / 出席・欠席・公欠 / 60日先まで</p>
+        <span class="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-400">Firebase Auth + Firestore</span>
+      </footer>
+    </main>
+  </div>
+
+  <div id="toastRoot" class="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+    import {
+      getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+      createUserWithEmailAndPassword, signOut, updateProfile
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+    import {
+      getFirestore, collection, doc, query, where, orderBy, limit,
+      onSnapshot, addDoc, getDoc, setDoc, runTransaction, serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEbuclY9AvNhFF5FVH9HSa895g7t9TnUs",
+      authDomain: "receipt-tracker-78d9f.firebaseapp.com",
+      projectId: "receipt-tracker-78d9f",
+      storageBucket: "receipt-tracker-78d9f.firebasestorage.app",
+      messagingSenderId: "298768350843",
+      appId: "1:298768350843:web:4149d54e9afaf7ba992cde",
+      measurementId: "G-QRWGWW915J"
+    };
+
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
+
+    /* ============================================================
+       Whitelisted roster & constants
+       ============================================================ */
+    const ROSTER = [
+      { id: 1,  code: '2608003', name: '狩野 輝空',   email: '2608003@technos.cloud', colors: ['#6366f1', '#8b5cf6'] },
+      { id: 2,  code: '2608006', name: '鈴木 斗和',   email: '2608006@technos.cloud', colors: ['#0ea5e9', '#06b6d4'] },
+      { id: 3,  code: '2608005', name: '小林 大輝',   email: '2608005@technos.cloud', colors: ['#10b981', '#14b8a6'] },
+      { id: 4,  code: '2608001', name: '吉田 瑛都',   email: '2608001@technos.cloud', colors: ['#f59e0b', '#f97316'] },
+      { id: 5,  code: '2608009', name: '降旗 吏輝',   email: '2608009@technos.cloud', colors: ['#f43f5e', '#ec4899'] },
+      { id: 6,  code: '2608011', name: 'M ALASHRAF TOLIMAT',   email: '2608011@technos.cloud', colors: ['#d946ef', '#a855f7'] },
+      { id: 7,  code: '2667037', name: '仲村 亜莉沙', email: '2667037@technos.cloud', colors: ['#3b82f6', '#6366f1'] },
+      { id: 8,  code: '2608002', name: '森田 一楓',   email: '2608002@technos.cloud', colors: ['#84cc16', '#10b981'] },
+      { id: 9,  code: '2608007', name: '田名網 悠翔', email: '2608007@technos.cloud', colors: ['#f97316', '#ef4444'] },
+      { id: 10, code: '2608008', name: '佐藤 和樹',   email: '2608008@technos.cloud', colors: ['#14b8a6', '#0ea5e9'] }
+    ];
+
+    const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+    const MAX_PLAN_DAYS = 60;
+
+    const STATUS = {
+      present: { label: '出席', labelEn: 'Present', pill: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500', onBtn: 'bg-emerald-600 text-white ring-emerald-600 shadow-sm shadow-emerald-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50' },
+      absent: { label: '欠席', labelEn: 'Absent', pill: 'bg-rose-50 text-rose-700 ring-rose-200', dot: 'bg-rose-500', onBtn: 'bg-rose-600 text-white ring-rose-600 shadow-sm shadow-rose-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-rose-50' },
+      official: { label: '公欠', labelEn: 'Official Absence', pill: 'bg-amber-50 text-amber-700 ring-amber-200', dot: 'bg-amber-500', onBtn: 'bg-amber-500 text-white ring-amber-500 shadow-sm shadow-amber-200', offBtn: 'bg-white text-slate-600 ring-slate-200 hover:bg-amber-50' }
+    };
+
+    const ANCHOR_FALLBACK_KEY = 'odl.firebase.rotationAnchor.v1';
+
+    let TODAY = keyOf(new Date());
+    let ROTATION_ANCHOR = null;
+
+    /* ============================================================
+       Date helpers
+       ============================================================ */
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function keyOf(date) { return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`; }
+    function parseKey(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    function addDays(key, amount) {
+      const d = parseKey(key);
+      d.setDate(d.getDate() + amount);
+      return keyOf(d);
+    }
+    function dayDiff(fromKey, toKey) {
+      const a = parseKey(fromKey);
+      const b = parseKey(toKey);
+      return Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) -
+        Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000);
+    }
+    function dateLabel(key) {
+      const d = parseKey(key);
+      return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAYS[d.getDay()]}）`;
+    }
+    function shortDate(key) {
+      const d = parseKey(key);
+      return `${d.getMonth() + 1}/${d.getDate()}`;
+    }
+    function weekday(key) { return WEEKDAYS[parseKey(key).getDay()]; }
+    function relativeLabel(key, baseKey) {
+      const diff = dayDiff(baseKey, key);
+      if (diff === 0) return '今日';
+      if (diff === 1) return '明日';
+      if (diff === 2) return '明後日';
+      return `あと${diff}日`;
+    }
+    function timeLabel(iso) {
+      if (!iso) return '—';
+      try {
+        const value = typeof iso.toDate === 'function' ? iso.toDate() : new Date(iso);
+        return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(value);
+      } catch { return '—'; }
+    }
+    function dateTimeLabel(ts) {
+      if (!ts) return '—';
+      try {
+        const value = typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+        return new Intl.DateTimeFormat('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(value);
+      } catch { return '—'; }
+    }
+    function monthKeyOf(dateKey) { return dateKey.slice(0, 7); }
+    function addMonths(monthKey, amount) {
+      const [y, m] = monthKey.split('-').map(Number);
+      const d = new Date(y, m - 1 + amount, 1);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    }
+    function monthLabel(monthKey) {
+      const [y, m] = monthKey.split('-').map(Number);
+      return `${y}年${m}月`;
+    }
+    function daysInMonth(monthKey) {
+      const [y, m] = monthKey.split('-').map(Number);
+      return new Date(y, m, 0).getDate();
+    }
+    function isPlanDate(dateKey) {
+      return dateKey >= TODAY && dateKey <= addDays(TODAY, MAX_PLAN_DAYS);
+    }
+
+    /* ============================================================
+       Rotation anchor (Firestore-synced with local fallback)
+       ============================================================ */
+    function loadFallbackAnchor() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(ANCHOR_FALLBACK_KEY) || 'null');
+        if (saved && typeof saved.date === 'string' && Number.isInteger(saved.index) && saved.index >= 0 && saved.index < ROSTER.length) {
+          return { date: saved.date, index: saved.index };
+        }
+      } catch (err) {
+        console.warn('Anchor fallback read failed:', err);
+      }
+      return null;
+    }
+
+    function saveFallbackAnchor(anchor) {
+      try { localStorage.setItem(ANCHOR_FALLBACK_KEY, JSON.stringify(anchor)); } catch (err) { /* ignore */ }
+    }
+
+    ROTATION_ANCHOR = loadFallbackAnchor() || { date: TODAY, index: 1 }; // 鈴木 斗和
+
+    /* ============================================================
+       Rotation / cascade
+       ============================================================ */
+    let dutyCache = {};
+
+    function getStatusMap(dateKey) {
+      const map = statuses[dateKey];
+      return map && typeof map === 'object' ? map : {};
+    }
+
+    function isWeekend(dateKey) {
+      const day = parseKey(dateKey).getDay();
+      return day === 0 || day === 6;
+    }
+
+    const CLASS_ALERT_TIMES = {
+      1: { hour: 9, minute: 0, start: '09:10', period: '1限' },
+      2: { hour: 11, minute: 0, start: '11:10', period: '3限' },
+      3: { hour: 9, minute: 0, start: '09:10', period: '1限' },
+      4: { hour: 9, minute: 0, start: '09:10', period: '1限' },
+      5: { hour: 10, minute: 0, start: '10:10', period: '2限' }
+    };
+
+    function formatClock(hour, minute) {
+      return `${pad(hour)}:${pad(minute)}`;
+    }
+
+    function getClassAlertInfo(dateKey) {
+      const day = parseKey(dateKey).getDay();
+      if (day === 0 || day === 6) return null;
+      const config = CLASS_ALERT_TIMES[day];
+      if (!config) return null;
+      return {
+        ...config,
+        day,
+        alertTime: formatClock(config.hour, config.minute),
+        label: `${WEEKDAYS[day]}曜日 · ${config.period}開始 ${config.start} の10分前`
+      };
+    }
+
+    function weekendDuty(dateKey) {
+      return {
+        date: dateKey, isWeekend: true, designated: null, effective: null,
+        shifted: false, steps: 0, reason: null,
+        absentCodes: new Set(), officialCodes: new Set(), unavailableCodes: new Set(),
+        absents: [], officials: [], unavailable: []
+      };
+    }
+
+    // Persistent-base simulation over weekdays only:
+    // - Saturday/Sunday have no leader and freeze the rotation pointer.
+    // - The base pointer advances only after the base student serves.
+    // - If the base is absent, the pointer stays for the next weekday.
+    // - Cascading fallback skips the previous weekday's active leader.
+    function buildDutyForDay(dateKey, pointer, previousActiveCode) {
+      if (isWeekend(dateKey)) return weekendDuty(dateKey);
+      const map = getStatusMap(dateKey);
+      const base = ROSTER[pointer];
+      const absentCodes = new Set(ROSTER.filter((s) => map[s.code] === 'absent').map((s) => s.code));
+      const officialCodes = new Set(ROSTER.filter((s) => map[s.code] === 'official').map((s) => s.code));
+      const unavailableCodes = new Set([...absentCodes, ...officialCodes]);
+
+      let effective = null;
+      let shifted = false;
+      let steps = 0;
+      let reason = null;
+
+      if (!unavailableCodes.has(base.code)) {
+        effective = base;
+      } else {
+        shifted = true;
+        reason = map[base.code] === 'official' ? 'official' : 'absent';
+        for (let step = 1; step < ROSTER.length; step += 1) {
+          const candidate = ROSTER[(pointer + step) % ROSTER.length];
+          if (unavailableCodes.has(candidate.code)) continue;
+          if (previousActiveCode && candidate.code === previousActiveCode) continue;
+          effective = candidate;
+          steps = step;
+          break;
+        }
+      }
+
+      return {
+        date: dateKey,
+        designated: base,
+        effective,
+        shifted,
+        steps,
+        reason,
+        absentCodes,
+        officialCodes,
+        unavailableCodes,
+        absents: ROSTER.filter((s) => absentCodes.has(s.code)),
+        officials: ROSTER.filter((s) => officialCodes.has(s.code)),
+        unavailable: ROSTER.filter((s) => unavailableCodes.has(s.code))
+      };
+    }
+
+    function rebuildDutyCache() {
+      dutyCache = {};
+      const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
+      const endDate = addDays(TODAY, MAX_PLAN_DAYS);
+      let pointer = ROTATION_ANCHOR.index;
+      let previousActiveCode = null;
+      let cursor = startDate;
+      let guard = 0;
+
+      while (cursor <= endDate && guard < 800) {
+        const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
+        dutyCache[cursor] = duty;
+        if (!duty.isWeekend) {
+          if (duty.effective) {
+            if (duty.effective.code === duty.designated.code) {
+              pointer = (pointer + 1) % ROSTER.length;
+            }
+            previousActiveCode = duty.effective.code;
+          } else {
+            previousActiveCode = null;
+          }
+        }
+        cursor = addDays(cursor, 1);
+        guard += 1;
+      }
+    }
+
+    function computeDuty(dateKey) {
+      if (dutyCache[dateKey]) return dutyCache[dateKey];
+      // On-demand simulation for a date outside the cached window.
+      const startDate = ROTATION_ANCHOR.date <= TODAY ? ROTATION_ANCHOR.date : TODAY;
+      let pointer = ROTATION_ANCHOR.index;
+      let previousActiveCode = null;
+      let cursor = startDate;
+      let guard = 0;
+      while (cursor <= dateKey && guard < 800) {
+        const duty = buildDutyForDay(cursor, pointer, previousActiveCode);
+        dutyCache[cursor] = duty;
+        if (!duty.isWeekend) {
+          if (duty.effective) {
+            if (duty.effective.code === duty.designated.code) {
+              pointer = (pointer + 1) % ROSTER.length;
+            }
+            previousActiveCode = duty.effective.code;
+          } else {
+            previousActiveCode = null;
+          }
+        }
+        cursor = addDays(cursor, 1);
+        guard += 1;
+      }
+      return dutyCache[dateKey] || (isWeekend(dateKey) ? weekendDuty(dateKey) : buildDutyForDay(dateKey, ROTATION_ANCHOR.index, null));
+    }
+
+    function designatedIndex(dateKey) {
+      const designated = computeDuty(dateKey).designated;
+      return designated ? ROSTER.findIndex((s) => s.code === designated.code) : -1;
+    }
+
+    function buildShiftNotice(duty) {
+      if (!duty || !duty.effective || !duty.shifted) return null;
+      const start = ROSTER.findIndex((s) => s.code === duty.designated.code);
+      const skipped = [];
+      for (let step = 0; step < ROSTER.length; step += 1) {
+        const student = ROSTER[(start + step) % ROSTER.length];
+        if (student.code === duty.effective.code) break;
+        const status = statusOf(duty.date, student);
+        if (status === 'absent' || status === 'official') skipped.push({ student, status });
+      }
+      if (!skipped.length) return null;
+      const parts = skipped.map((item) => `(${item.student.name}) が${STATUS[item.status].label}`);
+      const lead = parts.length === 1
+        ? `本日の予定日直 ${parts[0]}`
+        : `本日の予定日直 ${parts[0]}、および ${parts.slice(1).join('、')}`;
+      const messageJa = `⚠️ ${lead}のため、本日の日直は ${duty.effective.name} さんに交代しました。`;
+      const messageEn = `⚠️ Today's scheduled leader ${duty.designated.name} is unavailable due to ${skipped.map((item) => STATUS[item.status].labelEn).join(' / ')}. One Day Leader duty transferred to ${duty.effective.name}.`;
+      return { messageJa, messageEn };
+    }
+
+    function nextWeekdayDuty(dateKey) {
+      let cursor = addDays(dateKey, 1);
+      let guard = 0;
+      while (isWeekend(cursor) && guard < 7) {
+        cursor = addDays(cursor, 1);
+        guard += 1;
+      }
+      return computeDuty(cursor);
+    }
+
+    function statusOf(dateKey, student) {
+      if (!student) return 'present';
+      const value = getStatusMap(dateKey)[student.code];
+      return value === 'absent' || value === 'official' ? value : 'present';
+    }
+
+    function studentByCode(code) {
+      return ROSTER.find((s) => s.code === String(code)) || null;
+    }
+
+    function studentById(id) {
+      return ROSTER.find((s) => s.id === Number(id)) || null;
+    }
+
+    function findStudentByIdentifier(raw) {
+      const value = String(raw || '').trim().toLowerCase().replace(/\s+/g, '');
+      if (!value) return null;
+      return ROSTER.find((s) => s.email.toLowerCase() === value || s.code === value) || null;
+    }
+
+    function normalizeName(value) {
+      return String(value || '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+    }
+
+    /* ============================================================
+       Cloud / auth state
+       ============================================================ */
+    let statuses = {};
+    let alerts = [];
+    let firebaseUser = null;
+    let currentStudent = null;
+    let session = null;
+    let loginNotice = '';
+    let userMenuOpen = false;
+    let loginBusy = false;
+    let signupBusy = false;
+    let authTab = 'signin';
+    let selectedDate = TODAY;
+    let calendarMonth = TODAY.slice(0, 7);
+    let cloudState = 'idle'; // idle | connecting | live | error
+    let cloudError = '';
+    let cloudUnsubs = [];
+    let statusSnapshotReady = false;
+    let alertsSnapshotReady = false;
+    let lastAlertId = null;
+    let anchorSynced = false;
+    let authAnnouncementTimer = null;
+
+    const notified = {};
+
+
+    /* ============================================================
+       HTML helpers
+       ============================================================ */
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function initials(name) { return name.replace(/\s+/g, '').slice(0, 2); }
+
+    function avatar(student, size = 'h-14 w-14', text = 'text-lg') {
+      if (!student) return '';
+      return `<div class="${size} grid shrink-0 place-items-center rounded-2xl font-extrabold text-white shadow-sm" style="background:linear-gradient(135deg, ${student.colors[0]}, ${student.colors[1]})" aria-hidden="true"><span class="${text}">${escapeHtml(initials(student.name))}</span></div>`;
+    }
+
+    function statusPill(status) {
+      const style = STATUS[status] || STATUS.present;
+      return `<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset ${style.pill}"><span class="h-1.5 w-1.5 rounded-full ${style.dot}"></span>${style.label}</span>`;
+    }
+
+    function cardHeader(eyebrow, title, right = '') {
+      return `<div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">${eyebrow}</p>
+          <h2 class="mt-0.5 text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">${title}</h2>
+        </div>
+        ${right}
+      </div>`;
+    }
+
+    function iconCheck(classes = 'h-4 w-4') {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="${classes}" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+    function iconX(classes = 'h-4 w-4') {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="${classes}" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke-linecap="round"/></svg>`;
+    }
+    function iconLock(classes = 'h-5 w-5') {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="${classes}" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 1 1 8 0v3" stroke-linecap="round"/></svg>`;
+    }
+    function iconCrown(classes = 'h-5 w-5') {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="${classes}" aria-hidden="true"><path d="M3 8l4 3 5-7 5 7 4-3-2 11H5L3 8Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 19h14" stroke-linecap="round"/></svg>`;
+    }
+    function iconShield(classes = 'h-4 w-4') {
+      return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="${classes}" aria-hidden="true"><path d="M12 3l7 3v6c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6l7-3Z" stroke-linejoin="round"/><path d="m9 12 2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    }
+
+    /* ============================================================
+       Toast
+       ============================================================ */
+    function showToast(title, message, type = 'info') {
+      const root = document.getElementById('toastRoot');
+      if (!root) return;
+      const palette = {
+        success: 'border-emerald-200 bg-white', error: 'border-rose-200 bg-white',
+        info: 'border-indigo-200 bg-white', warning: 'border-amber-200 bg-white'
+      };
+      const iconPalette = {
+        success: 'bg-emerald-100 text-emerald-600', error: 'bg-rose-100 text-rose-600',
+        info: 'bg-indigo-100 text-indigo-600', warning: 'bg-amber-100 text-amber-600'
+      };
+      const icons = {
+        success: iconCheck('h-4 w-4'), error: iconX('h-4 w-4'),
+        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="h-4 w-4"><path d="M12 11v5M12 8h.01" stroke-linecap="round"/></svg>',
+        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-4 w-4"><path d="M12 8v5M12 16h.01M10.3 4.3 2.8 17.5A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.5L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      };
+      const toast = document.createElement('div');
+      toast.className = `toast-enter pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border ${palette[type] || palette.info} p-3.5 shadow-xl shadow-slate-200/70`;
+      toast.setAttribute('role', 'status');
+      toast.innerHTML = `
+        <div class="grid h-8 w-8 shrink-0 place-items-center rounded-xl ${iconPalette[type] || iconPalette.info}">${icons[type] || icons.info}</div>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <p class="text-sm font-extrabold text-slate-900">${escapeHtml(title)}</p>
+          <p class="mt-0.5 text-xs leading-relaxed text-slate-500">${escapeHtml(message)}</p>
+        </div>
+        <button type="button" class="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="閉じる">${iconX('h-3.5 w-3.5')}</button>`;
+      toast.querySelector('button').addEventListener('click', () => dismissToast(toast));
+      root.appendChild(toast);
+      setTimeout(() => dismissToast(toast), 5600);
+    }
+
+    function dismissToast(toast) {
+      if (!toast || toast.dataset.leaving) return;
+      toast.dataset.leaving = '1';
+      toast.classList.remove('toast-enter');
+      toast.classList.add('toast-leave');
+      setTimeout(() => toast.remove(), 260);
+    }
+
+    /* ============================================================
+       Auth UI helpers
+       ============================================================ */
+    function setLoginError(message) {
+      const el = document.getElementById('loginError');
+      if (!el) return;
+      if (!message) { el.classList.add('hidden'); el.textContent = ''; return; }
+      el.classList.remove('hidden');
+      el.textContent = message;
+    }
+
+    function setSignupError(message) {
+      const el = document.getElementById('signupError');
+      if (!el) return;
+      if (!message) { el.classList.add('hidden'); el.textContent = ''; return; }
+      el.classList.remove('hidden');
+      el.textContent = message;
+    }
+
+    function setLoginNotice(message) {
+      loginNotice = message || '';
+      const el = document.getElementById('loginNotice');
+      if (!el) return;
+      if (!loginNotice) { el.classList.add('hidden'); el.textContent = ''; }
+      else { el.classList.remove('hidden'); el.textContent = loginNotice; }
+    }
+
+    function setLoginBusy(busy) {
+      loginBusy = busy;
+      const btn = document.getElementById('loginSubmit');
+      const label = document.getElementById('loginSubmitLabel');
+      if (!btn || !label) return;
+      btn.disabled = busy;
+      label.textContent = busy ? '認証中…' : 'ログイン';
+    }
+
+    function setSignupBusy(busy) {
+      signupBusy = busy;
+      const btn = document.getElementById('signupSubmit');
+      const label = document.getElementById('signupSubmitLabel');
+      if (!btn || !label) return;
+      btn.disabled = busy;
+      label.textContent = busy ? '登録処理中…' : 'アカウントを作成';
+    }
+
+    function switchAuthTab(tab) {
+      authTab = tab === 'signup' ? 'signup' : 'signin';
+      const isSignup = authTab === 'signup';
+      document.getElementById('signinPanel').classList.toggle('hidden', isSignup);
+      document.getElementById('signupPanel').classList.toggle('hidden', !isSignup);
+      const signinBtn = document.getElementById('authTabSignin');
+      const signupBtn = document.getElementById('authTabSignup');
+      signinBtn.className = isSignup
+        ? 'rounded-lg px-2 py-2 text-[11px] font-extrabold text-slate-500 transition hover:text-slate-800'
+        : 'rounded-lg bg-white px-2 py-2 text-[11px] font-extrabold text-indigo-700 shadow-sm transition';
+      signupBtn.className = isSignup
+        ? 'rounded-lg bg-white px-2 py-2 text-[11px] font-extrabold text-indigo-700 shadow-sm transition'
+        : 'rounded-lg px-2 py-2 text-[11px] font-extrabold text-slate-500 transition hover:text-slate-800';
+      signinBtn.setAttribute('aria-selected', isSignup ? 'false' : 'true');
+      signupBtn.setAttribute('aria-selected', isSignup ? 'true' : 'false');
+      setLoginError('');
+      setSignupError('');
+      setTimeout(() => {
+        const target = isSignup ? document.getElementById('signupName') : document.getElementById('loginId');
+        if (target) target.focus();
+      }, 60);
+    }
+
+    function renderAuthRosterStatus() {
+      const el = document.getElementById('authRosterStatus');
+      if (!el) return;
+      el.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-200">Whitelist roster</p>
+          <p class="text-xs font-black text-white">10 <span class="font-bold text-slate-400">students</span></p>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-1">
+          ${ROSTER.map((s) => `<span title="${escapeHtml(s.name)} / ${escapeHtml(s.email)}" class="grid h-6 w-6 place-items-center rounded-full text-[8px] font-black text-white" style="background:linear-gradient(135deg,${s.colors[0]},${s.colors[1]})">${escapeHtml(initials(s.name).slice(0, 1))}</span>`).join('')}
+        </div>
+        <p class="mt-2 text-[9px] leading-relaxed text-slate-300">${ROSTER.map((s) => escapeHtml(s.name)).join('・')}</p>
+        <p class="mt-1 text-[10px] leading-relaxed text-slate-400">Firebase Authentication に登録できるのは、この10名の氏名・学籍番号・学校メールと完全一致するアカウントのみです。</p>`;
+    }
+
+    function applyAuthUI() {
+      const loggedIn = Boolean(firebaseUser && currentStudent);
+      document.getElementById('authView').classList.toggle('hidden', loggedIn);
+      document.getElementById('appView').classList.toggle('hidden', !loggedIn);
+      if (!loggedIn) {
+        renderAuthRosterStatus();
+        setLoginNotice(loginNotice);
+        setLoginBusy(false);
+        setSignupBusy(false);
+      }
+    }
+
+    /* ============================================================
+       Cloud sync status
+       ============================================================ */
+    function renderCloudStatus() {
+      const el = document.getElementById('cloudStatus');
+      if (!el) return;
+      const map = {
+        idle: { label: '待機', classes: 'border-slate-200 bg-white text-slate-400', dot: 'bg-slate-300' },
+        connecting: { label: '接続中', classes: 'border-amber-200 bg-amber-50 text-amber-600', dot: 'bg-amber-400' },
+        live: { label: 'LIVE', classes: 'border-emerald-200 bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500' },
+        error: { label: '同期エラー', classes: 'border-rose-200 bg-rose-50 text-rose-600', dot: 'bg-rose-500' }
+      };
+      const value = map[cloudState] || map.idle;
+      el.className = `inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-extrabold ${value.classes}`;
+      el.innerHTML = `<span class="h-1.5 w-1.5 rounded-full ${value.dot}"></span>${value.label}`;
+      el.title = cloudError || (cloudState === 'live' ? 'Firestore とリアルタイム同期中' : 'Cloud Firestore');
+    }
+
+    let cloudErrorShown = false;
+    function handleCloudError(scope, err) {
+      console.error(`Firestore ${scope} error:`, err);
+      cloudState = 'error';
+      cloudError = `${scope}: ${err && (err.code || err.message) ? (err.code || err.message) : 'Unknown error'}`;
+      renderCloudStatus();
+      if (!cloudErrorShown) {
+        cloudErrorShown = true;
+        showToast('Firestore 同期エラー', 'セキュリティルールまたはネットワーク接続を確認してください。', 'error');
+      }
+      if (currentStudent) renderAll();
+    }
+
+    function stopCloudListeners() {
+      cloudUnsubs.forEach((unsub) => {
+        try { unsub(); } catch (err) { console.warn(err); }
+      });
+      cloudUnsubs = [];
+      statusSnapshotReady = false;
+      alertsSnapshotReady = false;
+      lastAlertId = null;
+    }
+
+    function maybeAnnounceLeader() {
+      if (!currentStudent) return;
+      const duty = computeDuty(TODAY);
+      if (duty.effective && duty.effective.id === currentStudent.id) {
+        announceLeader(duty, duty.shifted);
+      }
+    }
+
+    async function seedInitialTodayStatuses() {
+      if (ROTATION_ANCHOR.date !== TODAY) return;
+      try {
+        const ref = doc(db, 'statuses', TODAY);
+        const snap = await getDoc(ref);
+        if (snap.exists()) return;
+        const seeded = { '2608006': 'absent', '2608005': 'official' };
+        await setDoc(ref, {
+          date: TODAY,
+          statuses: seeded,
+          updatedAt: serverTimestamp(),
+          updatedBy: 'system-initial-seed',
+          seedVersion: 1
+        });
+        statuses[TODAY] = seeded;
+        rebuildDutyCache();
+        renderAll();
+      } catch (err) {
+        handleCloudError('initial status seed', err);
+      }
+    }
+
+    async function ensureRotationAnchor() {
+      const ref = doc(db, 'config', 'rotation');
+      let anchor = null;
+      try {
+        await runTransaction(db, async (transaction) => {
+          const snap = await transaction.get(ref);
+          if (snap.exists()) {
+            const data = snap.data();
+            if (typeof data.anchorDate === 'string' && Number.isInteger(data.anchorIndex) && data.anchorIndex >= 0 && data.anchorIndex < ROSTER.length) {
+              anchor = { date: data.anchorDate, index: data.anchorIndex };
+            }
+          }
+          if (!anchor) {
+            anchor = { date: TODAY, index: 1 };
+            transaction.set(ref, {
+              anchorDate: TODAY,
+              anchorIndex: 1,
+              createdAt: serverTimestamp()
+            });
+          }
+        });
+        if (anchor) {
+          ROTATION_ANCHOR = anchor;
+          saveFallbackAnchor(anchor);
+          rebuildDutyCache();
+        }
+        await seedInitialTodayStatuses();
+      } catch (err) {
+        handleCloudError('rotation anchor', err);
+      }
+
+      try {
+        const unsub = onSnapshot(ref, (snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          if (typeof data.anchorDate === 'string' && Number.isInteger(data.anchorIndex) && data.anchorIndex >= 0 && data.anchorIndex < ROSTER.length) {
+            ROTATION_ANCHOR = { date: data.anchorDate, index: data.anchorIndex };
+            saveFallbackAnchor(ROTATION_ANCHOR);
+            rebuildDutyCache();
+            if (currentStudent) renderAll();
+          }
+        }, (err) => handleCloudError('rotation listener', err));
+        cloudUnsubs.push(unsub);
+      } catch (err) {
+        handleCloudError('rotation listener', err);
+      }
+    }
+
+    async function startCloudListeners() {
+      stopCloudListeners();
+      cloudState = 'connecting';
+      cloudError = '';
+      cloudErrorShown = false;
+      renderCloudStatus();
+      await ensureRotationAnchor();
+
+      try {
+        const unsubStatuses = onSnapshot(collection(db, 'statuses'), (snapshot) => {
+          const next = {};
+          snapshot.forEach((document) => {
+            const data = document.data();
+            if (data && typeof data.date === 'string') {
+              next[data.date] = data.statuses && typeof data.statuses === 'object' ? data.statuses : {};
+            }
+          });
+          statuses = next;
+          rebuildDutyCache();
+          statusSnapshotReady = true;
+          cloudState = 'live';
+          cloudError = '';
+          renderAll();
+          maybeAnnounceLeader();
+        }, (err) => handleCloudError('status listener', err));
+        cloudUnsubs.push(unsubStatuses);
+      } catch (err) {
+        handleCloudError('status listener', err);
+      }
+
+      try {
+        const alertsQuery = query(collection(db, 'alerts'), orderBy('createdAt', 'desc'), limit(30));
+        const unsubAlerts = onSnapshot(alertsQuery, (snapshot) => {
+          const list = snapshot.docs.map((document) => { const data = document.data(); return { id: document.id, ...data, at: data.createdAt || null }; });
+          const latest = list[0] || null;
+          if (alertsSnapshotReady && latest && latest.id !== lastAlertId) {
+            if (!currentStudent || latest.reporterCode !== currentStudent.code) {
+              showToast('クラス通知', latest.messageJa || '', latest.type === 'fallback' ? 'warning' : 'info');
+              sendBrowserNotification('One Day Leader', latest.messageEn || latest.messageJa || '', `odl-alert-${latest.id}`);
+            }
+          }
+          alerts = list;
+          lastAlertId = latest ? latest.id : null;
+          alertsSnapshotReady = true;
+          renderAlerts();
+        }, (err) => handleCloudError('alert listener', err));
+        cloudUnsubs.push(unsubAlerts);
+      } catch (err) {
+        handleCloudError('alert listener', err);
+      }
+    }
+
+    /* ============================================================
+       Firebase Auth
+       ============================================================ */
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+      if (loginBusy) return;
+      const idInput = document.getElementById('loginId');
+      const passInput = document.getElementById('loginPassword');
+      const identifier = idInput.value.trim();
+      const password = passInput.value;
+      setLoginError('');
+
+      if (!identifier || !password) {
+        setLoginError('学籍番号／メールアドレスとパスワードを入力してください。');
+        return;
+      }
+
+      const student = findStudentByIdentifier(identifier);
+      if (!student) {
+        setLoginError('この学籍番号／メールアドレスはホワイトリストに登録されていません。');
+        return;
+      }
+
+      setLoginBusy(true);
+      try {
+        await signInWithEmailAndPassword(auth, student.email, password);
+        setLoginError('');
+        setLoginNotice('');
+        passInput.value = '';
+        ensureNotificationPermission();
+      } catch (err) {
+        console.error(err);
+        const code = err && err.code ? err.code : '';
+        if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+          setLoginError('メールアドレスまたはパスワードが正しくありません。未登録の場合は Sign Up からアカウントを作成してください。');
+        } else if (code === 'auth/too-many-requests') {
+          setLoginError('試行回数が多すぎます。しばらく待ってから再試行してください。');
+        } else if (code === 'auth/operation-not-allowed') {
+          setLoginError('Firebase Authentication のメール／パスワード認証が有効化されていません。');
+        } else {
+          setLoginError(`ログインに失敗しました。（${code || 'unknown error'}）`);
+        }
+        passInput.value = '';
+      } finally {
+        setLoginBusy(false);
+      }
+    }
+
+    async function handleSignupSubmit(event) {
+      event.preventDefault();
+      if (signupBusy) return;
+      setSignupError('');
+
+      const name = document.getElementById('signupName').value.trim();
+      const code = document.getElementById('signupId').value.trim();
+      const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+      const password = document.getElementById('signupPassword').value;
+
+      if (!name || !code || !email || !password) {
+        setSignupError('氏名・学籍番号・学校メール・パスワードをすべて入力してください。');
+        return;
+      }
+      if (!/^\d{7}$/.test(code)) {
+        setSignupError('学籍番号は7桁の数字で入力してください。');
+        return;
+      }
+      if (!/^[^\s@]+@technos\.cloud$/i.test(email)) {
+        setSignupError('学校メールアドレスは @technos.cloud で終わる必要があります。');
+        return;
+      }
+      if (password.length < 8) {
+        setSignupError('パスワードは8文字以上で設定してください。');
+        return;
+      }
+
+      const student = ROSTER.find((s) => s.code === code && s.email.toLowerCase() === email);
+      if (!student) {
+        setSignupError('入力された学籍番号と学校メールアドレスは、ホワイトリストの10名と一致しません。');
+        return;
+      }
+      if (normalizeName(name) !== normalizeName(student.name)) {
+        setSignupError('氏名がホワイトリストと一致しません。登録されている氏名を正確に入力してください。');
+        return;
+      }
+
+      setSignupBusy(true);
+      try {
+        const credential = await createUserWithEmailAndPassword(auth, student.email, password);
+        try { await updateProfile(credential.user, { displayName: student.name }); } catch (err) { console.warn(err); }
+        setSignupError('');
+        ensureNotificationPermission();
+        showToast('アカウントを作成しました', `${student.name} さんとして Firebase に登録しました。`, 'success');
+      } catch (err) {
+        console.error(err);
+        const codeValue = err && err.code ? err.code : '';
+        if (codeValue === 'auth/email-already-in-use') {
+          setSignupError('この学校メールはすでに Firebase に登録されています。「ログイン / Sign In」からサインインしてください。');
+        } else if (codeValue === 'auth/weak-password') {
+          setSignupError('パスワードが弱すぎます。8文字以上で設定してください。');
+        } else if (codeValue === 'auth/operation-not-allowed') {
+          setSignupError('Firebase Authentication のメール／パスワード認証が有効化されていません。');
+        } else {
+          setSignupError(`アカウント作成に失敗しました。（${codeValue || 'unknown error'}）`);
+        }
+      } finally {
+        setSignupBusy(false);
+      }
+    }
+
+    async function logout(message) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.warn(err);
+      }
+      setLoginNotice(message || '');
+      showToast('ログアウトしました', 'Firebase セッションを終了しました。', 'info');
+    }
+
+    function ensureSession() {
+      if (!firebaseUser || !currentStudent) {
+        applyAuthUI();
+        return false;
+      }
+      return true;
+    }
+
+    /* ============================================================
+       Notifications
+       ============================================================ */
+    function notificationSupported() { return 'Notification' in window; }
+
+    function updateNotificationButton() {
+      const btn = document.getElementById('notifBtn');
+      const label = document.getElementById('notifLabel');
+      if (!btn || !label) return;
+      let text = '通知をON';
+      let classes = 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600';
+      if (!notificationSupported()) {
+        text = '通知非対応';
+        classes = 'border-slate-200 bg-white text-slate-400';
+      } else if (Notification.permission === 'granted') {
+        text = '通知ON';
+        classes = 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300';
+      } else if (Notification.permission === 'denied') {
+        text = '通知ブロック中';
+        classes = 'border-rose-200 bg-rose-50 text-rose-600';
+      }
+      label.textContent = text;
+      btn.className = `flex items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold shadow-sm transition ${classes}`;
+      btn.title = notificationSupported() ? `ブラウザ通知: ${Notification.permission}` : 'このブラウザは通知に対応していません';
+    }
+
+    function sendBrowserNotification(title, body, tag) {
+      if (!notificationSupported() || Notification.permission !== 'granted') return;
+      try {
+        new Notification(title, { body, tag, renotify: false });
+      } catch (err) {
+        console.warn('Notification failed:', err);
+      }
+    }
+
+    const SCHEDULED_PUSH_KEY = 'odl.scheduledPush.v1';
+    const SCHEDULED_TOAST_KEY = 'odl.scheduledToast.v1';
+    let scheduledNotificationTimer = null;
+    let notificationPermissionRequested = false;
+
+    function readSentMap(key) {
+      try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
+    }
+
+    function markSent(key, dateKey) {
+      const map = readSentMap(key);
+      map[dateKey] = true;
+      const keys = Object.keys(map).sort();
+      while (keys.length > 30) delete map[keys.shift()];
+      try { localStorage.setItem(key, JSON.stringify(map)); } catch (err) { console.warn(err); }
+    }
+
+    function checkScheduledLeaderNotification() {
+      if (!firebaseUser || !currentStudent) return;
+      const info = getClassAlertInfo(TODAY);
+      if (!info) return; // Weekends are off.
+      const now = new Date();
+      const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), info.hour, info.minute, 0, 0);
+      const delta = now.getTime() - target.getTime();
+      if (delta < 0 || delta > 10 * 60 * 1000) return;
+
+      const duty = computeDuty(TODAY);
+      if (!duty.effective) return;
+      const content = `🔔 本日の日直通知: 本日の日直は 【${duty.effective.name}】 さんです！準備をお願いします。`;
+      const toastMap = readSentMap(SCHEDULED_TOAST_KEY);
+      if (!toastMap[TODAY]) {
+        showToast('本日の日直通知', content.replace('🔔 ', ''), 'info');
+        markSent(SCHEDULED_TOAST_KEY, TODAY);
+      }
+      if (notificationSupported() && Notification.permission === 'granted') {
+        const pushMap = readSentMap(SCHEDULED_PUSH_KEY);
+        if (!pushMap[TODAY]) {
+          sendBrowserNotification('本日の日直通知', content, `odl-scheduled-${TODAY}`);
+          markSent(SCHEDULED_PUSH_KEY, TODAY);
+        }
+      }
+    }
+
+    function startScheduledNotificationChecker() {
+      stopScheduledNotificationChecker();
+      checkScheduledLeaderNotification();
+      scheduledNotificationTimer = setInterval(() => {
+        if (keyOf(new Date()) !== TODAY) {
+          window.location.reload();
+          return;
+        }
+        checkScheduledLeaderNotification();
+      }, 20 * 1000);
+    }
+
+    function stopScheduledNotificationChecker() {
+      if (scheduledNotificationTimer) {
+        clearInterval(scheduledNotificationTimer);
+        scheduledNotificationTimer = null;
+      }
+    }
+
+    async function ensureNotificationPermission() {
+      if (!notificationSupported()) return;
+      if (Notification.permission === 'default' && !notificationPermissionRequested) {
+        notificationPermissionRequested = true;
+        try { await Notification.requestPermission(); } catch (err) { console.warn(err); }
+      }
+      updateNotificationButton();
+      checkScheduledLeaderNotification();
+    }
+
+    function announceLeader(duty, isFallback) {
+      if (!firebaseUser || !currentStudent || !duty || !duty.effective) return;
+      if (duty.effective.id !== currentStudent.id) return;
+      const key = `${firebaseUser.uid}:${duty.date}:${duty.effective.code}:${duty.designated.code}`;
+      if (notified[key]) return;
+
+      const title = isFallback ? '日直が交代しました' : "You are today's active One Day Leader!";
+      const body = isFallback
+        ? `${currentStudent.name} さんが本日の日直に選ばれました（${duty.designated.name} さんの欠席・公欠による自動交代）。`
+        : `${currentStudent.name} さん、本日の日直をお願いします。ステータスボードで出席状況を確認できます。`;
+
+      notified[key] = true;
+      if (notificationSupported() && Notification.permission === 'granted') {
+        sendBrowserNotification(title, body, `odl-login-${duty.date}`);
+      }
+      showToast(title, body, isFallback ? 'warning' : 'success');
+    }
+
+    async function requestNotifications() {
+      if (!ensureSession()) return;
+      if (!notificationSupported()) {
+        showToast('通知に対応していません', 'このブラウザでは Notification API が利用できません。', 'error');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        sendBrowserNotification('通知テスト', 'ブラウザ通知は正常に有効です。平日の指定時刻に本日の日直をお知らせします。', 'odl-test');
+        showToast('通知は有効です', '日直交代と平日の日直通知がブラウザに表示されます。', 'info');
+        startScheduledNotificationChecker();
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        showToast('通知がブロックされています', 'ブラウザのサイト設定から通知を許可してください。', 'error');
+        return;
+      }
+      try {
+        const permission = await Notification.requestPermission();
+        updateNotificationButton();
+        if (permission === 'granted') {
+          showToast('通知を有効にしました', '日直交代と平日の日直通知をブラウザに表示します。', 'success');
+          startScheduledNotificationChecker();
+        } else {
+          showToast('通知は許可されませんでした', 'あとからブラウザ設定で変更できます。', 'info');
+        }
+      } catch (err) {
+        console.warn(err);
+        showToast('通知の設定に失敗しました', 'ブラウザの権限設定を確認してください。', 'error');
+      }
+    }
+
+    /* ============================================================
+       Header / user menu
+       ============================================================ */
+    function renderHeader() {
+      if (!currentStudent) return;
+      const duty = computeDuty(TODAY);
+      document.getElementById('headerAvatar').innerHTML = avatar(currentStudent, 'h-8 w-8', 'text-[10px]');
+      document.getElementById('headerName').textContent = currentStudent.name;
+      const chip = document.getElementById('headerLeaderChip');
+      chip.innerHTML = duty.isWeekend
+        ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-600">休日 (Weekend / Off-Day)</span>`
+        : duty.effective
+        ? `<span class="inline-flex items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-bold text-indigo-600">${iconCrown('h-3.5 w-3.5')} 今日の日直: ${escapeHtml(duty.effective.name)}${duty.shifted ? '（交代）' : ''}</span>`
+        : `<span class="inline-flex items-center gap-1.5 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600">${iconLock('h-3.5 w-3.5')} 担当者不在</span>`;
+    }
+
+    function renderUserMenu() {
+      if (!currentStudent) return;
+      const duty = computeDuty(TODAY);
+      const isLeader = duty.effective && duty.effective.id === currentStudent.id;
+      const roleLabel = duty.isWeekend ? '休日' : isLeader ? '本日の日直' : '一般生徒';
+      const panel = document.getElementById('userMenuPanel');
+      panel.innerHTML = `
+        <div class="rounded-xl bg-slate-50 p-3">
+          <div class="flex items-center gap-2.5">
+            ${avatar(currentStudent, 'h-9 w-9', 'text-[11px]')}
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-xs font-extrabold text-slate-900">${escapeHtml(currentStudent.name)}</p>
+              <p class="truncate text-[10px] font-medium text-slate-500">${escapeHtml(currentStudent.email)}</p>
+            </div>
+          </div>
+          <div class="mt-2 flex items-center gap-1.5">
+            <span class="rounded bg-white px-1.5 py-0.5 text-[9px] font-bold text-slate-500 ring-1 ring-inset ring-slate-200">ID ${currentStudent.code}</span>
+            <span class="rounded px-1.5 py-0.5 text-[9px] font-extrabold ${isLeader ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 ring-1 ring-inset ring-slate-200'}">${roleLabel}</span>
+          </div>
+        </div>
+        <div class="mt-1.5 space-y-0.5">
+          <button type="button" data-action="logout" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-xs font-bold text-rose-500 transition hover:bg-rose-50">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            ログアウト
+          </button>
+        </div>
+        <div class="mt-1.5 border-t border-slate-100 px-3 pb-1 pt-2">
+          <p class="text-[9px] leading-relaxed text-slate-400">Firebase Auth · ${cloudState === 'live' ? 'Firestore LIVE' : cloudState === 'error' ? '同期エラー' : '接続中'}</p>
+        </div>`;
+      panel.classList.toggle('hidden', !userMenuOpen);
+      document.getElementById('userMenuBtn').setAttribute('aria-expanded', userMenuOpen ? 'true' : 'false');
+    }
+
+    function toggleUserMenu() {
+      if (!ensureSession()) return;
+      userMenuOpen = !userMenuOpen;
+      document.getElementById('userMenuPanel').classList.toggle('hidden', !userMenuOpen);
+      document.getElementById('userMenuBtn').setAttribute('aria-expanded', userMenuOpen ? 'true' : 'false');
+    }
+
+    /* ============================================================
+       Runtime alerts
+       ============================================================ */
+    async function publishStatusAlert(student, status, dateKey, before, after) {
+      const label = STATUS[status].label;
+      const labelEn = STATUS[status].labelEn;
+      const transferred = (before.effective ? before.effective.code : null) !== (after.effective ? after.effective.code : null);
+      const toName = after.effective ? after.effective.name : null;
+      const messageJa = `${student.name} さんが ${dateLabel(dateKey)} を「${label}」で登録しました。` +
+        (transferred
+          ? (toName ? ` 日直が ${toName} さんに交代しました。` : ' 日直を務められる出席者がいなくなりました。')
+          : '');
+      const messageEn = `${student.name} marked ${labelEn} for ${dateKey}.` +
+        (transferred
+          ? (toName ? ` One Day Leader duty transferred to ${toName}!` : ' No available leader remains.')
+          : '');
+
+      const payload = {
+        date: dateKey,
+        type: transferred ? 'fallback' : 'status',
+        priority: transferred ? 'high' : 'normal',
+        status,
+        reporterCode: student.code,
+        reporterName: student.name,
+        fromLeaderCode: before.effective ? before.effective.code : null,
+        fromLeaderName: before.effective ? before.effective.name : '担当者なし',
+        toLeaderCode: after.effective ? after.effective.code : null,
+        toLeaderName: toName,
+        messageJa,
+        messageEn
+      };
+
+      try {
+        await addDoc(collection(db, 'alerts'), { ...payload, createdAt: serverTimestamp() });
+      } catch (err) {
+        handleCloudError('alert write', err);
+      }
+      return payload;
+    }
+
+    /* ============================================================
+       Render: active leader banner
+       ============================================================ */
+    function renderBanner() {
+      const todayDuty = computeDuty(TODAY);
+      const selectedDuty = computeDuty(selectedDate);
+      const todayIsMe = Boolean(currentStudent && todayDuty.effective && todayDuty.effective.id === currentStudent.id);
+      const selectedIsMe = Boolean(currentStudent && selectedDuty.effective && selectedDuty.effective.id === currentStudent.id);
+      const el = document.getElementById('myBanner');
+
+      if (!todayIsMe && !selectedIsMe) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+
+      const isTodayBanner = todayIsMe;
+      const duty = isTodayBanner ? todayDuty : selectedDuty;
+      const title = isTodayBanner ? "You are today's active One Day Leader!" : 'You are scheduled as One Day Leader!';
+      const subtitle = isTodayBanner
+        ? 'あなたは本日の日直です。ステータスボードでクラスの状況を確認できます。'
+        : `あなたは ${dateLabel(selectedDate)} の日直に割り当てられています。予定カレンダーで出席状況を確認してください。`;
+
+      el.classList.remove('hidden');
+      el.innerHTML = `
+        <div class="fade-up relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-[1px] shadow-xl shadow-indigo-200/60">
+          <div class="relative overflow-hidden rounded-[23px] bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white sm:p-6">
+            <div class="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl"></div>
+            <div class="absolute -bottom-16 left-1/3 h-40 w-40 rounded-full bg-fuchsia-300/20 blur-2xl"></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" class="spin-slow absolute -right-6 -top-6 h-32 w-32 text-white/15" aria-hidden="true"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/></svg>
+            <div class="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-start gap-3">
+                <div class="pulse-ring grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/20 backdrop-blur-sm">${iconCrown('h-6 w-6')}</div>
+                <div>
+                  <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/70">${isTodayBanner ? 'Leader focus · Today' : 'Leader focus · Upcoming'}</p>
+                  <p class="mt-0.5 text-lg font-black leading-snug sm:text-xl">${title}</p>
+                  <p class="mt-1 text-xs font-medium text-white/80">${subtitle}</p>
+                  ${duty.shifted ? `<p class="mt-1 inline-flex rounded-lg bg-white/15 px-2 py-1 text-[10px] font-bold text-white/90">${escapeHtml(duty.designated.name)} さんの欠席・公欠により自動交代</p>` : ''}
+                </div>
+              </div>
+              <button type="button" data-action="scroll-schedule" class="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-extrabold text-indigo-700 shadow-lg shadow-indigo-900/20 transition hover:-translate-y-0.5 hover:bg-indigo-50 active:translate-y-0">予定カレンダーを見る →</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    /* ============================================================
+       Render: today hero
+       ============================================================ */
+    function renderHero() {
+      const duty = computeDuty(TODAY);
+      if (duty.isWeekend) {
+        const nextDuty = nextWeekdayDuty(TODAY);
+        document.getElementById('todayHero').innerHTML = `
+          <div class="relative overflow-hidden rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-7">
+            <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-sky-100 via-indigo-100 to-violet-100 blur-3xl"></div>
+            <div class="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-4">
+                <div class="grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-sky-100 to-indigo-100 text-sky-500 ring-1 ring-inset ring-sky-200 sm:h-24 sm:w-24">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-10 w-10"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 21v-3M12 21v-3M16 21v-3" stroke-linecap="round"/></svg>
+                </div>
+                <div>
+                  <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-extrabold text-sky-700 ring-1 ring-inset ring-sky-200">休日 (Weekend / Off-Day)</span>
+                  <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">本日は休日です</h2>
+                  <p class="mt-2 text-[11px] leading-relaxed text-slate-500">土曜・日曜は日直ローテーションの対象外です。順番は凍結され、次の平日に再開します。</p>
+                </div>
+              </div>
+              <div class="rounded-2xl border border-indigo-100 bg-indigo-50/70 px-4 py-3">
+                <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Next weekday</p>
+                <p class="mt-1 text-sm font-black text-slate-900">${nextDuty.effective ? escapeHtml(nextDuty.effective.name) : '不在'}</p>
+                <p class="mt-0.5 text-[10px] font-medium text-indigo-500">${dateLabel(nextDuty.date)}</p>
+              </div>
+            </div>
+            <div class="mt-5 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-[11px] font-bold text-slate-500 ring-1 ring-inset ring-slate-100">
+              <span>${dateLabel(TODAY)}</span><span class="text-sky-600">Leader assignment paused</span>
+            </div>
+          </div>`;
+        return;
+      }
+      const absentCount = ROSTER.filter((s) => statusOf(TODAY, s) === 'absent').length;
+      const officialCount = ROSTER.filter((s) => statusOf(TODAY, s) === 'official').length;
+      const activeCount = Math.max(0, ROSTER.length - absentCount - officialCount);
+      const tomorrow = computeDuty(addDays(TODAY, 1));
+      const isMeLeader = Boolean(currentStudent && duty.effective && duty.effective.id === currentStudent.id);
+
+      const unavailableChips = duty.unavailable.map((s) => {
+        const status = statusOf(TODAY, s);
+        const style = STATUS[status];
+        return `<span class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold ring-1 ring-inset ${style.pill}">${escapeHtml(s.name)} <span class="opacity-80">${style.label}</span></span>`;
+      }).join('');
+
+      const leaderBlock = duty.effective
+        ? `${avatar(duty.effective, 'h-20 w-20 sm:h-24 sm:w-24', 'text-2xl sm:text-3xl')}
+           <div class="min-w-0 flex-1">
+             <div class="flex flex-wrap items-center gap-2">
+               <span class="text-xs font-bold text-slate-500">本日の担当</span>
+               ${statusPill(statusOf(TODAY, duty.effective))}
+               ${isMeLeader ? '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-600 px-2.5 py-1 text-[11px] font-extrabold text-white">あなた</span>' : ''}
+               ${duty.shifted ? '<span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-extrabold text-amber-700 ring-1 ring-inset ring-amber-200">自動フォールバック</span>' : ''}
+             </div>
+             <h2 class="mt-1 truncate text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">${escapeHtml(duty.effective.name)}</h2>
+             ${duty.shifted
+               ? `<div class="mt-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] leading-relaxed text-amber-800">
+                    <p class="font-extrabold">${STATUS[duty.reason] ? STATUS[duty.reason].label : '欠席・公欠'}により担当を変更しました</p>
+                    <p class="mt-0.5">本来の担当 <span class="font-bold line-through decoration-amber-500/70">${escapeHtml(duty.designated.name)}</span> → <span class="font-black">${escapeHtml(duty.effective.name)}</span>${duty.steps > 1 ? `（${duty.steps}人先）` : ''}</p>
+                    ${unavailableChips ? `<p class="mt-1 flex flex-wrap gap-1">${unavailableChips}</p>` : ''}
+                  </div>`
+               : `<p class="mt-2 text-[11px] leading-relaxed text-slate-500">指定ローテーションどおりの担当です。担当者が欠席または公欠を登録すると、次の出席可能な生徒へ自動で交代します。</p>`}
+           </div>`
+        : `${avatar(duty.designated, 'h-20 w-20 sm:h-24 sm:w-24', 'text-2xl sm:text-3xl opacity-40')}
+           <div class="min-w-0 flex-1">
+             <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-extrabold text-rose-700 ring-1 ring-inset ring-rose-200">担当者不在</span>
+             <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">出席可能な日直がいません</h2>
+             <p class="mt-2 text-[11px] leading-relaxed text-slate-500">本日は全員が欠席または公欠のため、担当者を決定できません。</p>
+           </div>`;
+
+      document.getElementById('todayHero').innerHTML = `
+        <div class="relative overflow-hidden rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/60 sm:p-7">
+          <div class="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-gradient-to-br from-indigo-100 via-violet-100 to-fuchsia-100 blur-3xl"></div>
+          <div class="relative">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-indigo-500">Today's One Day Leader</p>
+                <p class="mt-1 text-lg font-black tracking-tight text-slate-900 sm:text-xl">${dateLabel(TODAY)}</p>
+              </div>
+              <div class="flex flex-col items-end gap-1">
+                <span class="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">Day ${designatedIndex(TODAY) + 1} / ${ROSTER.length}</span>
+                <span class="text-[10px] font-medium text-slate-400">次の担当: ${tomorrow.effective ? escapeHtml(tomorrow.effective.name) : '不在'}</span>
+              </div>
+            </div>
+            <div class="mt-5 flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div class="flex items-center gap-4 sm:flex-1">${leaderBlock}</div>
+              <div class="grid shrink-0 grid-cols-3 gap-2">
+                <div class="rounded-2xl bg-emerald-50 px-3 py-2.5 text-center ring-1 ring-inset ring-emerald-100"><p class="text-xl font-black text-emerald-600">${activeCount}</p><p class="text-[10px] font-bold text-emerald-700/70">出席可能</p></div>
+                <div class="rounded-2xl bg-rose-50 px-3 py-2.5 text-center ring-1 ring-inset ring-rose-100"><p class="text-xl font-black text-rose-600">${absentCount}</p><p class="text-[10px] font-bold text-rose-700/70">欠席</p></div>
+                <div class="rounded-2xl bg-amber-50 px-3 py-2.5 text-center ring-1 ring-inset ring-amber-100"><p class="text-xl font-black text-amber-600">${officialCount}</p><p class="text-[10px] font-bold text-amber-700/70">公欠</p></div>
+              </div>
+            </div>
+            ${unavailableChips ? `<div class="mt-4 flex flex-wrap gap-1.5">${unavailableChips}</div>` : ''}
+          </div>
+        </div>`;
+    }
+
+    /* ============================================================
+       Render: 60-day schedule calendar
+       ============================================================ */
+    function renderScheduleCard() {
+      if (!currentStudent) return;
+      const minMonth = monthKeyOf(TODAY);
+      const maxMonth = monthKeyOf(addDays(TODAY, MAX_PLAN_DAYS));
+      if (calendarMonth < minMonth) calendarMonth = minMonth;
+      if (calendarMonth > maxMonth) calendarMonth = maxMonth;
+
+      const selectedDuty = computeDuty(selectedDate);
+      const myStatus = statusOf(selectedDate, currentStudent);
+      const isTodaySelected = selectedDate === TODAY;
+      const firstWeekday = parseKey(`${calendarMonth}-01`).getDay();
+      const totalDays = daysInMonth(calendarMonth);
+
+      let cells = '';
+      for (let i = 0; i < firstWeekday; i += 1) cells += '<div class="min-h-[62px]" aria-hidden="true"></div>';
+      for (let day = 1; day <= totalDays; day += 1) {
+        const dateKey = `${calendarMonth}-${pad(day)}`;
+        const inRange = isPlanDate(dateKey);
+        const isToday = dateKey === TODAY;
+        const isSelected = dateKey === selectedDate;
+        const weekend = isWeekend(dateKey);
+        const duty = inRange ? computeDuty(dateKey) : null;
+        const personalStatus = !weekend && inRange ? statusOf(dateKey, currentStudent) : null;
+        const statusClass = personalStatus === 'absent'
+          ? 'bg-rose-100 text-rose-700'
+          : personalStatus === 'official'
+            ? 'bg-amber-100 text-amber-700'
+            : personalStatus === 'present'
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-100 text-slate-400';
+
+        let cellClass = 'relative flex min-h-[62px] flex-col items-center justify-start rounded-xl border p-1.5 text-center transition ';
+        if (!inRange) cellClass += 'cursor-default border-transparent bg-slate-50/50 text-slate-300';
+        else if (isSelected) cellClass += 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 shadow-sm';
+        else if (isToday) cellClass += 'border-fuchsia-300 bg-fuchsia-50/60 hover:border-fuchsia-400';
+        else cellClass += 'border-slate-100 bg-white hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50/40 hover:shadow-sm';
+
+        cells += `
+          <button type="button" data-action="select-date" data-date="${dateKey}" ${inRange ? '' : 'disabled'} class="${cellClass}" title="${inRange ? (weekend ? `${dateLabel(dateKey)} / 休日 (Weekend / Off-Day)` : `${dateLabel(dateKey)} / 日直: ${escapeHtml(duty.effective ? duty.effective.name : '不在')}`) : dateKey}">
+            <span class="flex w-full items-center justify-between">
+              <span class="text-[11px] font-extrabold ${isSelected ? 'text-indigo-700' : isToday ? 'text-fuchsia-600' : inRange ? (weekend ? 'text-sky-500' : 'text-slate-700') : 'text-slate-300'}">${day}</span>
+              ${inRange && !weekend && duty && duty.effective ? avatar(duty.effective, 'h-5 w-5', 'text-[7px]') : ''}
+            </span>
+            ${inRange && weekend ? '<span class="mt-1 rounded bg-sky-100 px-1 py-0.5 text-[8px] font-extrabold text-sky-600">休日</span>' : ''}
+            ${inRange && !weekend && personalStatus ? `<span class="mt-1 rounded px-1 py-0.5 text-[8px] font-extrabold ${statusClass}">${STATUS[personalStatus].label}</span>` : ''}
+            ${inRange && isToday ? '<span class="absolute inset-x-1 bottom-0.5 text-[7px] font-extrabold uppercase tracking-wide text-fuchsia-500">TODAY</span>' : ''}
+            ${inRange && !weekend && duty && duty.shifted ? '<span class="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-amber-400" title="日直交代"></span>' : ''}
+          </button>`;
+      }
+
+      const monthNav = `
+        <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          <button type="button" data-action="calendar-prev" ${calendarMonth <= minMonth ? 'disabled' : ''} class="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30" aria-label="前の月">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-3.5 w-3.5"><path d="m15 6-6 6 6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span class="min-w-[92px] px-1 text-center text-[11px] font-extrabold text-slate-700">${monthLabel(calendarMonth)}</span>
+          <button type="button" data-action="calendar-next" ${calendarMonth >= maxMonth ? 'disabled' : ''} class="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30" aria-label="次の月">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-3.5 w-3.5"><path d="m9 6 6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>`;
+
+      const weekdayHeaders = WEEKDAYS.map((label, index) =>
+        `<div class="py-1 text-center text-[9px] font-extrabold uppercase tracking-wider ${index === 0 ? 'text-rose-400' : index === 6 ? 'text-sky-400' : 'text-slate-400'}">${label}</div>`
+      ).join('');
+
+      const selectedWeekend = selectedDuty.isWeekend;
+      const statusButtons = ['present', 'absent', 'official'].map((statusKey) => {
+        const style = STATUS[statusKey];
+        const active = !selectedWeekend && myStatus === statusKey;
+        return `<button type="button" data-action="set-status" data-status="${statusKey}" aria-pressed="${active}" ${selectedWeekend ? 'disabled' : ''} class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-xs font-extrabold ring-1 ring-inset transition ${selectedWeekend ? 'cursor-not-allowed bg-slate-100 text-slate-300 ring-slate-200' : active ? style.onBtn : style.offBtn}">
+          <span>${style.label}</span><span class="text-[8px] font-bold opacity-70">${style.labelEn}</span>
+        </button>`;
+      }).join('');
+
+      const overview = Array.from({ length: MAX_PLAN_DAYS + 1 }, (_, i) => addDays(TODAY, i)).map((dateKey) => {
+        const duty = computeDuty(dateKey);
+        const weekend = isWeekend(dateKey);
+        const personalStatus = weekend ? null : statusOf(dateKey, currentStudent);
+        const isSelected = dateKey === selectedDate;
+        return `<button type="button" data-action="select-date" data-date="${dateKey}" title="${dateLabel(dateKey)}${weekend ? ' / 休日' : ''}" class="w-[96px] shrink-0 rounded-xl border p-2 text-left transition ${isSelected ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100' : weekend ? 'border-sky-100 bg-sky-50/50 hover:border-sky-200' : 'border-slate-100 bg-white hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50/40'}">
+          <span class="flex items-center justify-between gap-1">
+            <span class="text-[10px] font-extrabold ${isSelected ? 'text-indigo-700' : weekend ? 'text-sky-600' : 'text-slate-700'}">${shortDate(dateKey)}</span>
+            <span class="text-[9px] font-bold ${weekend ? 'text-sky-500' : 'text-slate-400'}">${weekday(dateKey)}</span>
+          </span>
+          <span class="mt-1 flex items-center gap-1">
+            ${weekend ? '<span class="grid h-5 w-5 place-items-center rounded-lg bg-sky-100 text-[7px] font-black text-sky-500">OFF</span>' : duty.effective ? avatar(duty.effective, 'h-5 w-5', 'text-[7px]') : '<span class="grid h-5 w-5 place-items-center rounded-lg bg-rose-50 text-[8px] font-black text-rose-500">×</span>'}
+            <span class="min-w-0 flex-1 truncate text-[9px] font-bold ${weekend ? 'text-sky-600' : duty.shifted ? 'text-amber-600' : 'text-slate-600'}">${weekend ? '休日' : duty.effective ? escapeHtml(duty.effective.name.split(' ')[0]) : '不在'}</span>
+          </span>
+          <span class="mt-1 inline-flex rounded px-1 py-0.5 text-[8px] font-extrabold ${weekend ? 'bg-sky-100 text-sky-600' : personalStatus === 'absent' ? 'bg-rose-100 text-rose-700' : personalStatus === 'official' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">${weekend ? '休日' : STATUS[personalStatus].label}</span>
+        </button>`;
+      }).join('');
+
+      const selectedLeaderBlock = selectedWeekend
+        ? `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-sky-100 text-sky-500"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-5 w-5"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-sky-500">Weekend / Off-Day</p><p class="text-sm font-extrabold text-sky-700">休日 (Weekend / Off-Day)</p><p class="mt-0.5 text-[10px] font-medium text-slate-400">土日は日直なし・ローテーション凍結</p></div></div>`
+        : selectedDuty.effective
+        ? `<div class="flex items-center gap-2.5">
+             ${avatar(selectedDuty.effective, 'h-10 w-10', 'text-xs')}
+             <div class="min-w-0 flex-1">
+               <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">この日の日直</p>
+               <p class="truncate text-sm font-extrabold text-slate-900">${escapeHtml(selectedDuty.effective.name)} ${currentStudent && selectedDuty.effective.id === currentStudent.id ? '<span class="rounded bg-indigo-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">あなた</span>' : ''}</p>
+               <p class="mt-0.5 text-[10px] font-medium ${selectedDuty.shifted ? 'text-amber-600' : 'text-slate-400'}">${selectedDuty.shifted ? `本来: ${escapeHtml(selectedDuty.designated.name)} → ${STATUS[selectedDuty.reason].label}で交代` : '指定ローテーション'}</p>
+             </div>
+           </div>`
+        : `<div class="flex items-center gap-2.5"><div class="grid h-10 w-10 place-items-center rounded-2xl bg-rose-50 text-rose-500">${iconX('h-5 w-5')}</div><div><p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-rose-500">この日の日直</p><p class="text-sm font-extrabold text-rose-700">出席可能な日直がいません</p></div></div>`;
+
+      document.getElementById('scheduleCard').innerHTML = `
+        <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-6">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Schedule · 60 days</p>
+              <h2 class="mt-0.5 text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">予定カレンダー / 2ヶ月先まで</h2>
+            </div>
+            ${monthNav}
+          </div>
+
+          <div class="mt-4 grid grid-cols-7 gap-1">
+            ${weekdayHeaders}
+            ${cells}
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl bg-slate-50 px-3 py-2 text-[9px] font-bold text-slate-500">
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-emerald-500"></span>出席</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-rose-500"></span>欠席</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-amber-500"></span>公欠</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-sky-400"></span>休日</span>
+            <span class="inline-flex items-center gap-1"><span class="h-2 w-2 rounded-full bg-indigo-400"></span>アバター = その日の日直</span>
+            <span class="text-slate-400">日付を選択して自分の予定を登録</span>
+          </div>
+
+          <div class="mt-4 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-[10px] font-extrabold text-slate-600">今後60日間の日直スケジュール</p>
+              <span class="text-[9px] font-medium text-slate-400">横にスクロール →</span>
+            </div>
+            <div class="mt-2 flex gap-1.5 overflow-x-auto pb-1">${overview}</div>
+          </div>
+
+          <div class="mt-4 rounded-2xl border border-indigo-100 bg-indigo-50/50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p class="text-[9px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Selected date</p>
+                <p class="mt-0.5 text-sm font-black text-slate-900">${dateLabel(selectedDate)}</p>
+              </div>
+              <span class="rounded-full bg-white px-2.5 py-1 text-[10px] font-extrabold text-indigo-600 ring-1 ring-inset ring-indigo-100">${isTodaySelected ? '今日' : relativeLabel(selectedDate, TODAY)}</span>
+            </div>
+            <div class="mt-3">${selectedLeaderBlock}</div>
+          </div>
+
+          <div class="mt-4">
+            <div class="mb-2 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] font-extrabold text-slate-600">自分の予定 / My plan</p>
+                <p class="mt-0.5 text-[10px] text-slate-400">${dateLabel(selectedDate)} のステータス</p>
+              </div>
+              ${selectedWeekend ? '<span class="rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-extrabold text-sky-600">休日 (Weekend / Off-Day)</span>' : statusPill(myStatus)}
+            </div>
+            <div class="grid grid-cols-3 gap-2">${statusButtons}</div>
+            <p class="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed ${selectedWeekend ? 'text-sky-600' : 'text-slate-400'}">
+              <span class="mt-0.5 shrink-0 ${selectedWeekend ? 'text-sky-400' : 'text-slate-300'}">${selectedWeekend ? iconCheck('h-3 w-3') : iconShield('h-3 w-3')}</span>
+              ${selectedWeekend ? '土曜・日曜は日直なし・ローテーション凍結です。平日を選択すると自分の予定を登録できます。' : '変更できるのは自分自身の予定だけです。欠席・公欠はその日の日直交代に即時反映されます。'}
+            </p>
+          </div>
+        </div>`;
+    }
+
+
+    /* ============================================================
+       Render: live alerts
+       ============================================================ */
+    function renderAlerts() {
+      const todayDuty = computeDuty(TODAY);
+      const shift = buildShiftNotice(todayDuty);
+      const derived = shift ? {
+        id: 'derived-today-shift',
+        date: TODAY,
+        at: new Date().toISOString(),
+        type: 'fallback',
+        priority: 'high',
+        messageJa: shift.messageJa,
+        messageEn: shift.messageEn
+      } : null;
+      const combined = [
+        ...(derived ? [derived] : []),
+        ...alerts.filter((a) => !derived || a.date !== TODAY)
+      ];
+      const feed = document.getElementById('alertFeed');
+
+      if (!combined.length) {
+        feed.classList.add('hidden');
+        feed.innerHTML = '';
+      } else {
+        feed.classList.remove('hidden');
+        feed.innerHTML = combined.slice(0, 2).map((alert) => {
+          const isTransfer = alert.type === 'fallback';
+          return `
+            <div role="alert" class="flex items-start gap-3 rounded-2xl border ${isTransfer ? 'border-rose-200 bg-gradient-to-r from-rose-50 to-amber-50 shadow-rose-100/60' : 'border-amber-200 bg-amber-50/80 shadow-amber-100/60'} p-4 shadow-lg">
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl ${isTransfer ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" class="h-5 w-5"><path d="M12 8v5M12 16h.01M10.3 4.3 2.8 17.5A2 2 0 0 0 4.5 20h15a2 2 0 0 0 1.7-2.5L13.7 4.3a2 2 0 0 0-3.4 0Z" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="text-[9px] font-extrabold uppercase tracking-[0.18em] ${isTransfer ? 'text-rose-500' : 'text-amber-600'}">Class-wide alert</p>
+                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-slate-500">${dateLabel(alert.date)}</span>
+                  <span class="rounded-full bg-white/70 px-2 py-0.5 text-[9px] font-bold text-slate-500">${timeLabel(alert.at)}</span>
+                  ${alert.priority === 'high' ? '<span class="rounded-full bg-rose-600 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider text-white">high priority</span>' : ''}
+                </div>
+                <p class="mt-1 text-sm font-extrabold leading-relaxed ${isTransfer ? 'text-rose-900' : 'text-amber-900'}">${escapeHtml(alert.messageJa)}</p>
+                <p class="mt-1 text-[10px] font-medium text-slate-500">${escapeHtml(alert.messageEn)}</p>
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      const card = document.getElementById('alertsCard');
+      if (!combined.length) {
+        card.innerHTML = `
+          <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50">
+            ${cardHeader('Live alerts', 'クラス通知', '<span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-500">0 件</span>')}
+            <div class="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4 text-center">
+              <p class="text-xs font-extrabold text-slate-600">通知はまだありません</p>
+              <p class="mt-1 text-[10px] leading-relaxed text-slate-400">欠席・公欠の登録や日直交代が発生すると、ここにクラス全体のアラートが表示されます。</p>
+            </div>
+          </div>`;
+        return;
+      }
+
+      card.innerHTML = `
+        <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50">
+          ${cardHeader('Live alerts', 'クラス通知', `<span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-rose-600">${combined.length} 件</span>`)}
+          <div class="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+            ${combined.slice(0, 24).map((alert) => {
+              const isTransfer = alert.type === 'fallback';
+              return `
+                <div class="rounded-xl border ${isTransfer ? 'border-rose-100 bg-rose-50/60' : 'border-amber-100 bg-amber-50/60'} p-2.5">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-[9px] font-extrabold ${isTransfer ? 'text-rose-500' : 'text-amber-600'}">${isTransfer ? '日直交代' : 'ステータス更新'} · ${shortDate(alert.date)}</span>
+                    <span class="text-[9px] font-medium text-slate-400">${timeLabel(alert.at)}</span>
+                  </div>
+                  <p class="mt-1 text-[10px] font-semibold leading-relaxed text-slate-600">${escapeHtml(alert.messageJa)}</p>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+    }
+
+    /* ============================================================
+       Render: class status board
+       ============================================================ */
+    function renderClassBoard() {
+      const duty = computeDuty(selectedDate);
+      if (duty.isWeekend) {
+        document.getElementById('classBoard').innerHTML = `
+          <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-6">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-sky-500">Class status board</p>
+                <h2 class="mt-0.5 text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">${dateLabel(selectedDate)}</h2>
+              </div>
+              <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2.5 py-1 text-[10px] font-extrabold text-sky-600">休日 (Weekend / Off-Day)</span>
+            </div>
+            <div class="mt-4 rounded-2xl border border-sky-100 bg-sky-50/70 p-8 text-center">
+              <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-white text-sky-500 shadow-sm ring-1 ring-inset ring-sky-100">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-7 w-7"><path d="M3 18h18M5 18V8l4 2 3-5 3 5 4-2v10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <p class="mt-3 text-sm font-extrabold text-sky-800">土曜・日曜は日直がありません</p>
+              <p class="mt-1 text-[11px] leading-relaxed text-sky-600">ローテーションは週末の間は凍結され、次の平日に前回の続きから再開します。ステータス登録も平日のみ可能です。</p>
+            </div>
+          </div>`;
+        return;
+      }
+      const cards = ROSTER.map((student) => {
+        const status = statusOf(selectedDate, student);
+        const isEffective = duty.effective && duty.effective.id === student.id;
+        const isDesignated = duty.designated.id === student.id;
+        const isMe = currentStudent && currentStudent.id === student.id;
+        return `
+          <div class="relative flex items-center gap-3 rounded-2xl border p-3 transition ${isEffective ? 'border-indigo-300 bg-indigo-50/80 shadow-sm shadow-indigo-100' : 'border-slate-100 bg-white hover:bg-slate-50'}">
+            ${avatar(student, 'h-10 w-10', 'text-xs')}
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <p class="truncate text-xs font-extrabold text-slate-900">${escapeHtml(student.name)}</p>
+                ${isMe ? '<span class="rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-extrabold text-indigo-600">YOU</span>' : ''}
+                ${isEffective ? '<span class="inline-flex items-center gap-0.5 rounded bg-indigo-600 px-1.5 py-0.5 text-[8px] font-extrabold text-white">' + iconCrown('h-2.5 w-2.5') + '日直</span>' : ''}
+                ${isDesignated && !isEffective ? '<span class="rounded bg-slate-200 px-1.5 py-0.5 text-[8px] font-extrabold text-slate-500">本来</span>' : ''}
+              </div>
+              <p class="mt-1 text-[9px] font-medium text-slate-400">${student.code}</p>
+            </div>
+            ${statusPill(status)}
+          </div>`;
+      }).join('');
+
+      const presentCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'present').length;
+      const absentCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'absent').length;
+      const officialCount = ROSTER.filter((s) => statusOf(selectedDate, s) === 'official').length;
+
+      document.getElementById('classBoard').innerHTML = `
+        <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-6">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">Class status board</p>
+              <h2 class="mt-0.5 text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">${dateLabel(selectedDate)} のメンバー状況</h2>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-extrabold text-slate-500">${iconLock('h-3 w-3')} 閲覧のみ</span>
+              ${duty.effective ? `<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-extrabold text-indigo-600 ring-1 ring-inset ring-indigo-100">${iconCrown('h-3 w-3')} ${selectedDate === TODAY ? '本日の日直' : 'この日の日直'}: ${escapeHtml(duty.effective.name)}</span>` : '<span class="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-rose-600">日直不在</span>'}
+            </div>
+          </div>
+
+          <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">${cards}</div>
+
+          <div class="mt-4 grid grid-cols-4 gap-2">
+            <div class="rounded-xl bg-emerald-50 px-2 py-2 text-center ring-1 ring-inset ring-emerald-100"><p class="text-base font-black text-emerald-600">${presentCount}</p><p class="text-[9px] font-bold text-emerald-700/70">出席</p></div>
+            <div class="rounded-xl bg-rose-50 px-2 py-2 text-center ring-1 ring-inset ring-rose-100"><p class="text-base font-black text-rose-600">${absentCount}</p><p class="text-[9px] font-bold text-rose-700/70">欠席</p></div>
+            <div class="rounded-xl bg-amber-50 px-2 py-2 text-center ring-1 ring-inset ring-amber-100"><p class="text-base font-black text-amber-600">${officialCount}</p><p class="text-[9px] font-bold text-amber-700/70">公欠</p></div>
+            <div class="rounded-xl bg-slate-50 px-2 py-2 text-center ring-1 ring-inset ring-slate-200"><p class="text-base font-black text-slate-500">${ROSTER.length}</p><p class="text-[9px] font-bold text-slate-400">対象者</p></div>
+          </div>
+          <p class="mt-3 text-[10px] leading-relaxed text-slate-400">表示中の日付: ${dateLabel(selectedDate)}。カレンダーで日付を切り替えて、各日の日直とクラス状況を確認できます。</p>
+        </div>`;
+    }
+
+
+    /* ============================================================
+       Render: account & permissions
+       ============================================================ */
+    function renderSecurityCard() {
+      if (!firebaseUser || !currentStudent) return;
+      const todayDuty = computeDuty(TODAY);
+      const selectedDuty = computeDuty(selectedDate);
+      const isTodayLeader = todayDuty.effective && todayDuty.effective.id === currentStudent.id;
+      const isSelectedLeader = selectedDuty.effective && selectedDuty.effective.id === currentStudent.id;
+      const alertInfo = getClassAlertInfo(TODAY);
+      const permissionLabel = !notificationSupported() ? '非対応' : Notification.permission === 'granted' ? '許可済み' : Notification.permission === 'denied' ? 'ブロック中' : '未許可';
+      document.getElementById('securityCard').innerHTML = `
+        <div class="rounded-3xl border border-white bg-white p-5 shadow-xl shadow-slate-200/50">
+          ${cardHeader('Security', 'アカウントと権限', `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-extrabold text-emerald-600">${iconShield('h-3 w-3')} 認証済み</span>`)}
+          <div class="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-100">
+            ${avatar(currentStudent, 'h-11 w-11', 'text-sm')}
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-extrabold text-slate-900">${escapeHtml(currentStudent.name)}</p>
+              <p class="truncate text-[10px] font-medium text-slate-400">${escapeHtml(currentStudent.email)}</p>
+              <p class="mt-0.5 text-[10px] font-bold text-slate-500">${currentStudent.code} · ${isTodayLeader ? '本日の日直' : isSelectedLeader ? `${shortDate(selectedDate)} の日直` : '一般生徒'}</p>
+            </div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">Firebase Auth</span><span class="max-w-[150px] truncate font-bold text-slate-600">${escapeHtml(firebaseUser.email || '')}</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">Firestore</span><span class="font-bold ${cloudState === 'error' ? 'text-rose-500' : 'text-emerald-600'}">${cloudState === 'live' ? 'LIVE 同期中' : cloudState === 'error' ? '同期エラー' : '接続中'}</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">予定登録可能期間</span><span class="font-bold text-slate-600">今日〜${shortDate(addDays(TODAY, MAX_PLAN_DAYS))}（平日）</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">ローテーション起点</span><span class="font-bold text-slate-600">${shortDate(ROTATION_ANCHOR.date)} / ${escapeHtml(ROSTER[ROTATION_ANCHOR.index].name)}</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">日直通知</span><span class="font-bold text-slate-600">${alertInfo ? `${alertInfo.alertTime}（${alertInfo.period}開始10分前）` : '週末のためなし'}</span></div>
+            <div class="flex items-center justify-between text-[10px]"><span class="font-semibold text-slate-400">通知権限</span><span class="font-bold ${notificationSupported() && Notification.permission === 'granted' ? 'text-emerald-600' : 'text-slate-500'}">${permissionLabel}</span></div>
+          </div>
+          <div class="mt-3 space-y-1.5 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
+            <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 自分の予定（出席・欠席・公欠）変更</p>
+            <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 2ヶ月先までの日直スケジュール閲覧</p>
+            <p class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">${iconLock('h-3 w-3')} 他生徒の予定・アカウント変更</p>
+            <p class="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600">${iconCheck('h-3 w-3')} 欠席・公欠時の日直自動交代</p>
+          </div>
+          <button type="button" data-action="request-notify" class="mt-3 w-full rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-[10px] font-extrabold text-indigo-600 transition hover:bg-indigo-100">通知を許可 / テスト通知</button>
+          <button type="button" data-action="logout" class="mt-2 w-full rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-[10px] font-extrabold text-rose-500 transition hover:bg-rose-100">ログアウト</button>
+        </div>`;
+    }
+
+    /* ============================================================
+       Master render
+       ============================================================ */
+    function renderAll() {
+      applyAuthUI();
+      if (!firebaseUser || !currentStudent) return;
+      renderCloudStatus();
+      renderHeader();
+      renderUserMenu();
+      renderBanner();
+      renderHero();
+      renderAlerts();
+      renderScheduleCard();
+      renderClassBoard();
+      renderSecurityCard();
+      updateNotificationButton();
+    }
+
+    /* ============================================================
+       Actions
+       ============================================================ */
+    function selectDate(dateKey) {
+      if (!ensureSession() || !dateKey || !isPlanDate(dateKey)) return;
+      selectedDate = dateKey;
+      calendarMonth = monthKeyOf(dateKey);
+      renderBanner();
+      renderScheduleCard();
+      renderClassBoard();
+    }
+
+    function changeCalendarMonth(amount) {
+      if (!ensureSession()) return;
+      const minMonth = monthKeyOf(TODAY);
+      const maxMonth = monthKeyOf(addDays(TODAY, MAX_PLAN_DAYS));
+      const next = addMonths(calendarMonth, amount);
+      if (next < minMonth || next > maxMonth) return;
+      calendarMonth = next;
+      renderScheduleCard();
+    }
+
+    async function setMyStatus(statusKey) {
+      if (!ensureSession()) return;
+      if (!['present', 'absent', 'official'].includes(statusKey)) return;
+      if (!isPlanDate(selectedDate)) {
+        showToast('日付が範囲外です', '今日から60日先までの日付を選択してください。', 'error');
+        return;
+      }
+      if (isWeekend(selectedDate)) {
+        showToast('休日のため登録できません', '土曜・日曜は日直ローテーションとステータス登録の対象外です。', 'warning');
+        return;
+      }
+
+      const previousStatus = statusOf(selectedDate, currentStudent);
+      if (previousStatus === statusKey) {
+        showToast('すでに登録済みです', `${dateLabel(selectedDate)} は「${STATUS[statusKey].label}」で登録されています。`, 'info');
+        return;
+      }
+
+      const previousMap = { ...getStatusMap(selectedDate) };
+      const before = computeDuty(selectedDate);
+      statuses[selectedDate] = { ...previousMap, [currentStudent.code]: statusKey };
+      rebuildDutyCache();
+      const after = computeDuty(selectedDate);
+      renderAll();
+
+      try {
+        const statusRef = doc(db, 'statuses', selectedDate);
+        await runTransaction(db, async (transaction) => {
+          const snap = await transaction.get(statusRef);
+          const existing = snap.exists() && snap.data().statuses && typeof snap.data().statuses === 'object'
+            ? snap.data().statuses
+            : {};
+          transaction.set(statusRef, {
+            date: selectedDate,
+            statuses: { ...existing, [currentStudent.code]: statusKey },
+            updatedAt: serverTimestamp(),
+            updatedBy: firebaseUser.uid
+          }, { merge: true });
+        });
+
+        let alert = null;
+        if (statusKey === 'absent' || statusKey === 'official') {
+          alert = await publishStatusAlert(currentStudent, statusKey, selectedDate, before, after);
+        }
+        renderAll();
+        showToast(
+          'ステータスを更新しました',
+          alert && alert.messageJa ? alert.messageJa : `${dateLabel(selectedDate)} を「${STATUS[statusKey].label}」に設定しました。`,
+          statusKey === 'present' ? 'success' : 'warning'
+        );
+      } catch (err) {
+        statuses[selectedDate] = previousMap;
+        if (!Object.keys(previousMap).length) delete statuses[selectedDate];
+        rebuildDutyCache();
+        renderAll();
+        handleCloudError('status write', err);
+        showToast('保存に失敗しました', 'Firestore の接続またはセキュリティルールを確認してください。', 'error');
+      }
+    }
+
+    /* ============================================================
+       Event wiring
+       ============================================================ */
+    document.getElementById('loginForm').addEventListener('submit', handleLoginSubmit);
+    document.getElementById('signupForm').addEventListener('submit', handleSignupSubmit);
+
+    document.getElementById('togglePassBtn').addEventListener('click', () => {
+      const input = document.getElementById('loginPassword');
+      const btn = document.getElementById('togglePassBtn');
+      if (!input || !btn) return;
+      const visible = input.type === 'text';
+      input.type = visible ? 'password' : 'text';
+      btn.textContent = visible ? '表示' : '隠す';
+      input.focus();
+    });
+
+    document.addEventListener('click', (event) => {
+      const trigger = event.target.closest('[data-action]');
+      if (trigger) {
+        switch (trigger.dataset.action) {
+          case 'auth-tab': switchAuthTab(trigger.dataset.tab); break;
+          case 'set-status': setMyStatus(trigger.dataset.status); break;
+          case 'select-date': selectDate(trigger.dataset.date); break;
+          case 'calendar-prev': changeCalendarMonth(-1); break;
+          case 'calendar-next': changeCalendarMonth(1); break;
+          case 'scroll-schedule':
+            document.getElementById('scheduleCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            break;
+          case 'request-notify': requestNotifications(); break;
+          case 'toggle-user-menu': toggleUserMenu(); break;
+          case 'logout': logout(); break;
+          default: break;
+        }
+      }
+
+      if (userMenuOpen && !event.target.closest('#userMenuPanel') && !event.target.closest('#userMenuBtn')) {
+        userMenuOpen = false;
+        renderUserMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && userMenuOpen) {
+        userMenuOpen = false;
+        renderUserMenu();
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      updateNotificationButton();
+      checkScheduledLeaderNotification();
+    });
+
+    setInterval(() => {
+      if (keyOf(new Date()) !== TODAY) window.location.reload();
+    }, 60 * 1000);
+
+    /* ============================================================
+       Firebase auth state & init
+       ============================================================ */
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        stopCloudListeners();
+        stopScheduledNotificationChecker();
+        firebaseUser = null;
+        currentStudent = null;
+        session = null;
+        statuses = {};
+        alerts = [];
+        dutyCache = {};
+        cloudState = 'idle';
+        cloudError = '';
+        Object.keys(notified).forEach((key) => delete notified[key]);
+        applyAuthUI();
+        renderCloudStatus();
+        return;
+      }
+
+      const student = ROSTER.find((s) => s.email.toLowerCase() === String(user.email || '').toLowerCase());
+      if (!student) {
+        await signOut(auth);
+        setLoginError('このメールアドレスはホワイトリストに登録されていません。');
+        applyAuthUI();
+        return;
+      }
+
+      firebaseUser = user;
+      currentStudent = student;
+      session = { loginAt: user.metadata.lastSignInTime || new Date().toISOString() };
+      selectedDate = TODAY;
+      calendarMonth = TODAY.slice(0, 7);
+      loginNotice = '';
+      setLoginError('');
+      setLoginNotice('');
+      // Show the required initial state immediately; Firestore snapshots replace it with live data.
+      if (ROTATION_ANCHOR.date === TODAY && !statuses[TODAY]) {
+        statuses[TODAY] = { '2608006': 'absent', '2608005': 'official' };
+        rebuildDutyCache();
+      }
+      applyAuthUI();
+      renderAll();
+      await startCloudListeners();
+      ensureNotificationPermission();
+      startScheduledNotificationChecker();
+    });
+
+    switchAuthTab('signin');
+    renderAuthRosterStatus();
+    applyAuthUI();
+    renderCloudStatus();
+    setLoginNotice(loginNotice);
+    setTimeout(() => {
+      const input = document.getElementById('loginId');
+      if (input && !input.value) input.focus();
+    }, 200);
+  </script>
+</body>
+</html>
