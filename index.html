@@ -355,28 +355,28 @@
 
     const TIMETABLE = {
       1: [
-        { label: '1-3時限', start: '09:10', end: '12:00', room: '301 Game Lab' },
-        { label: '4時限', start: '12:10', end: '13:00', room: '301 Game Lab' },
-        { label: '6-7時限', start: '14:10', end: '16:00', room: '305 アニメPC' }
+        { label: '1-3時限', start: '09:10', end: '12:00', subject: 'プログラム講座Ⅰ', room: '301 Game Lab' },
+        { label: '4時限', start: '12:10', end: '13:00', subject: 'ゲーム企画・制作Ⅰ', room: '301 Game Lab' },
+        { label: '6-7時限', start: '14:10', end: '16:00', subject: 'ゲームグラフィックⅠ', room: '305 アニメPC' }
       ],
       2: [
-        { label: '3-4時限', start: '11:10', end: '13:00', room: '807 教室' },
-        { label: '6-7時限', start: '14:10', end: '16:00', room: '305 アニメPC' },
-        { label: '8時限', start: '16:10', end: '17:00', room: '305 アニメPC' }
+        { label: '3-4時限', start: '11:10', end: '13:00', subject: '一般教養 / ビジネス', room: '807 教室' },
+        { label: '6-7時限', start: '14:10', end: '16:00', subject: 'ゲームグラフィックⅠ', room: '305 アニメPC' },
+        { label: '8時限', start: '16:10', end: '17:00', subject: '作品制作・自習', room: '305 アニメPC' }
       ],
       3: [
-        { label: '1-3時限', start: '09:10', end: '12:00', room: '305 アニメPC' },
-        { label: '3-4時限', start: '11:10', end: '13:00', room: '307 オープンラボ / 301 Game Lab' },
-        { label: '6時限', start: '14:10', end: '15:00', room: '401 教室' }
+        { label: '1-3時限', start: '09:10', end: '12:00', subject: 'ゲームグラフィックⅠ', room: '305 アニメPC' },
+        { label: '3-4時限', start: '11:10', end: '13:00', subject: 'プログラム講座Ⅰ', room: '307 オープンラボ' },
+        { label: '6時限', start: '14:10', end: '15:00', subject: 'ホームルーム', room: '401 教室' }
       ],
       4: [
-        { label: '1-3時限', start: '09:10', end: '12:00', room: '301 Game Lab' },
-        { label: '5時限', start: '13:10', end: '14:00', room: '305 アニメPC' },
-        { label: '7時限', start: '15:10', end: '16:00', room: '301 Game Lab' }
+        { label: '1-3時限', start: '09:10', end: '12:00', subject: 'プログラム講座Ⅰ', room: '301 Game Lab' },
+        { label: '5時限', start: '13:10', end: '14:00', subject: 'ゲームグラフィックⅠ', room: '305 アニメPC' },
+        { label: '7時限', start: '15:10', end: '16:00', subject: 'ゲーム数学', room: '301 Game Lab' }
       ],
       5: [
-        { label: '2-4時限', start: '10:10', end: '13:00', room: '305 アニメPC' },
-        { label: '5時限', start: '13:10', end: '14:00', room: '805・806 教室' }
+        { label: '2-4時限', start: '10:10', end: '13:00', subject: 'ゲームグラフィックⅠ', room: '305 アニメPC' },
+        { label: '5時限', start: '13:10', end: '14:00', subject: 'キャリア就職指導', room: '805・806 教室' }
       ]
     };
 
@@ -2107,10 +2107,10 @@
       const nextBlock = blocks.find((block) => timeToMinutes(block.start) > nowMinutes);
       let classHtml = '';
       if (activeBlocks.length) {
-        classHtml = activeBlocks.map((block) => `<span class="text-sm font-black text-emerald-800">LIVE NOW: ${block.label} (${block.start}~${block.end}) - ${block.room}</span>`).join('<span class="mx-1 text-emerald-300">/</span>');
+        classHtml = activeBlocks.map((block) => `<span class="text-sm font-black text-emerald-800">LIVE NOW: ${block.label} (${block.start}~${block.end}) - ${block.subject} (${block.room})</span>`).join('<span class="mx-1 text-emerald-300">/</span>');
       } else {
         classHtml = `<span class="text-sm font-black text-slate-700">授業時間外</span>` +
-          (nextBlock ? `<span class="ml-2 text-[10px] font-bold text-slate-500">次の授業: ${nextBlock.label} (${nextBlock.start}~${nextBlock.end}) ${nextBlock.room}</span>` : '<span class="ml-2 text-[10px] font-bold text-slate-400">本日の授業は終了しました</span>');
+          (nextBlock ? `<span class="ml-2 text-[10px] font-bold text-slate-500">次の授業: ${nextBlock.label} (${nextBlock.start}~${nextBlock.end}) ${nextBlock.subject} (${nextBlock.room})</span>` : '<span class="ml-2 text-[10px] font-bold text-slate-400">本日の授業は終了しました</span>');
       }
 
       el.innerHTML = `
