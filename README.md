@@ -11,6 +11,9 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
 
 ## Features
 
+- Firebase Auth uses explicit `browserLocalPersistence`, so sessions survive reloads and code updates.
+- Anti-cache meta tags and an `APP_VERSION` auto-reload check keep deployed clients current.
+
 - 2-month (60-day) availability calendar.
 - Personal statuses: 出席 (Present), 欠席 (Absent), 公欠 (Official Absence).
 - Weekdays only:

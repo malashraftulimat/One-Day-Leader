@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <meta name="theme-color" content="#4f46e5" />
   <title>One Day Leader | 日直ローテーション管理</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -289,7 +292,8 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
     import {
       getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-      createUserWithEmailAndPassword, signOut, updateProfile
+      createUserWithEmailAndPassword, signOut, updateProfile,
+      setPersistence, browserLocalPersistence
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
     import {
       getFirestore, collection, doc, query, where, orderBy, limit,
@@ -306,9 +310,17 @@
       measurementId: "G-HYSP31HZ42"
     };
 
+    const APP_VERSION = '1.0.1';
+    const VERSION_STORAGE_KEY = 'odl.appVersion.v1';
+
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
+
+    // Explicit local persistence keeps the student signed in across reloads and code updates.
+    setPersistence(auth, browserLocalPersistence).catch((err) => {
+      console.warn('Auth persistence setup failed:', err);
+    });
 
     /* ============================================================
        Whitelisted roster & constants
@@ -2031,14 +2043,64 @@
       }
     });
 
+    /* ============================================================
+       Auto-reload version check (session stays signed in)
+       ============================================================ */
+    let versionReloadInProgress = false;
+    let lastRemoteVersionCheck = 0;
+
+    function initVersionCheck() {
+      try {
+        const stored = localStorage.getItem(VERSION_STORAGE_KEY);
+        if (stored && stored !== APP_VERSION) {
+          localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+          versionReloadInProgress = true;
+          window.location.reload();
+          return;
+        }
+        localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+      } catch (err) {
+        console.warn('Version storage unavailable:', err);
+      }
+    }
+
+    async function checkRemoteAppVersion(force = false) {
+      if (versionReloadInProgress) return;
+      const now = Date.now();
+      if (!force && now - lastRemoteVersionCheck < 60 * 1000) return;
+      lastRemoteVersionCheck = now;
+      try {
+        const url = new URL('index.html', window.location.href);
+        url.searchParams.set('ts', String(now));
+        const response = await fetch(url.toString(), { cache: 'no-store' });
+        if (!response.ok) return;
+        const source = await response.text();
+        const match = source.match(/const APP_VERSION = ['"]([^'"]+)['"]/);
+        if (match && match[1] !== APP_VERSION) {
+          versionReloadInProgress = true;
+          try { localStorage.setItem(VERSION_STORAGE_KEY, match[1]); } catch (err) { console.warn(err); }
+          window.location.reload();
+        }
+      } catch (err) {
+        // Ignore offline/network errors; the current version continues to work.
+      }
+    }
+
     window.addEventListener('focus', () => {
       updateNotificationButton();
       checkScheduledLeaderNotification();
+      checkRemoteAppVersion();
     });
 
     setInterval(() => {
-      if (keyOf(new Date()) !== TODAY) window.location.reload();
-    }, 60 * 1000);
+      if (keyOf(new Date()) !== TODAY) {
+        window.location.reload();
+        return;
+      }
+      checkRemoteAppVersion();
+    }, 5 * 60 * 1000);
+
+    initVersionCheck();
 
     /* ============================================================
        Firebase auth state & init
