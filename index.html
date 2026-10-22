@@ -287,6 +287,13 @@
     </main>
   </div>
 
+  <!-- ============================================================
+       MANDATORY DAILY ATTENDANCE MODAL
+       ============================================================ -->
+  <div id="attendanceModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="attendanceModalTitle">
+    <div id="attendanceModalContent" class="fade-up flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-white/10 bg-white shadow-2xl"></div>
+  </div>
+
   <div id="toastRoot" class="pointer-events-none fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6"></div>
 
   <script type="module">
@@ -311,7 +318,7 @@
       measurementId: "G-HYSP31HZ42"
     };
 
-    const APP_VERSION = '1.0.2';
+    const APP_VERSION = '1.0.3';
     const VERSION_STORAGE_KEY = 'odl.appVersion.v1';
 
     const firebaseApp = initializeApp(firebaseConfig);
@@ -870,6 +877,11 @@
     let calendarMonth = TODAY.slice(0, 7);
     let periodDraftType = null;
     let periodDraftPeriod = 2;
+    let attendanceModalOpen = false;
+    let attendanceModalDraftType = null;
+    let attendanceModalPeriod = 2;
+    let attendanceModalBusy = false;
+    let attendanceModalError = '';
     let cloudState = 'idle'; // idle | connecting | live | error
     let cloudError = '';
     let cloudUnsubs = [];
@@ -1215,6 +1227,7 @@
           cloudError = '';
           renderAll();
           maybeAnnounceLeader();
+          maybeShowMandatoryAttendanceModal();
         }, (err) => handleCloudError('status listener', err));
         cloudUnsubs.push(unsubStatuses);
       } catch (err) {
@@ -1347,6 +1360,163 @@
         return false;
       }
       return true;
+    }
+
+    /* ============================================================
+       Mandatory daily attendance modal
+       ============================================================ */
+    function renderAttendanceModal() {
+      if (!currentStudent) return;
+      const box = document.getElementById('attendanceModalContent');
+      if (!box) return;
+      const options = ['present', 'absent', 'official', 'late', 'early'];
+      const buttons = options.map((key) => {
+        const style = STATUS[key];
+        const active = attendanceModalDraftType === key;
+        return `<button type="button" data-action="modal-status" data-status="${key}" ${attendanceModalBusy ? 'disabled' : ''} class="flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-3 text-xs font-extrabold ring-1 ring-inset transition ${attendanceModalBusy ? 'cursor-not-allowed opacity-50' : active ? style.onBtn : style.offBtn}">
+          <span>${style.label}</span><span class="text-[8px] font-bold opacity-70">${style.labelEn}</span>
+        </button>`;
+      }).join('');
+
+      const periodPanel = attendanceModalDraftType ? `
+        <div class="rounded-2xl border border-sky-200 bg-sky-50/80 p-3.5">
+          <p class="text-xs font-extrabold text-sky-800">${attendanceModalDraftType === 'late' ? '何時限から出席しますか？' : '何時限で早退しますか？'}</p>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <select id="modalPeriodSelect" ${attendanceModalBusy ? 'disabled' : ''} class="rounded-xl border border-sky-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-sky-400">
+              ${PERIODS.map((p) => `<option value="${p.period}" ${p.period === attendanceModalPeriod ? 'selected' : ''}>${p.period}時限 (${p.start}~${p.end})</option>`).join('')}
+            </select>
+            <button type="button" data-action="modal-confirm-period" ${attendanceModalBusy ? 'disabled' : ''} class="rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-sky-700 disabled:opacity-50">登録する</button>
+            <button type="button" data-action="modal-cancel-period" ${attendanceModalBusy ? 'disabled' : ''} class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-500 transition hover:bg-slate-100 disabled:opacity-50">取消</button>
+          </div>
+        </div>` : '';
+
+      box.innerHTML = `
+        <div class="border-b border-slate-100 bg-gradient-to-r from-indigo-50 via-violet-50 to-fuchsia-50 p-5 sm:p-6">
+          <p class="text-[10px] font-extrabold uppercase tracking-[0.18em] text-indigo-500">Daily attendance</p>
+          <h2 id="attendanceModalTitle" class="mt-1 text-xl font-black tracking-tight text-slate-900">本日の出席状態を選択してください</h2>
+          <div class="mt-3 flex items-center gap-3 rounded-2xl bg-white/80 p-3 ring-1 ring-inset ring-indigo-100">
+            ${avatar(currentStudent, 'h-10 w-10', 'text-xs')}
+            <div class="min-w-0 flex-1">
+              <p class="truncate text-sm font-extrabold text-slate-900">${escapeHtml(currentStudent.name)}</p>
+              <p class="text-[10px] font-medium text-slate-500">${dateLabel(TODAY)}</p>
+            </div>
+            <span class="rounded-full bg-indigo-600 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-white">必須</span>
+          </div>
+        </div>
+        <div class="space-y-4 p-5 sm:p-6">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-5">${buttons}</div>
+          ${periodPanel}
+          <div id="attendanceModalError" class="${attendanceModalError ? '' : 'hidden'} rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-[11px] font-semibold leading-relaxed text-rose-700">${escapeHtml(attendanceModalError)}</div>
+          <p class="text-[10px] leading-relaxed text-slate-400">${attendanceModalBusy ? 'Firestore に保存中…' : '選択すると本日の日直ローテーションへ即時反映されます。このモーダルは選択するまで閉じられません。'}</p>
+        </div>`;
+    }
+
+    function openAttendanceModal() {
+      if (!currentStudent || attendanceModalOpen) return;
+      attendanceModalOpen = true;
+      attendanceModalDraftType = null;
+      attendanceModalPeriod = 2;
+      attendanceModalBusy = false;
+      attendanceModalError = '';
+      renderAttendanceModal();
+      const modal = document.getElementById('attendanceModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      const appView = document.getElementById('appView');
+      if (appView) appView.setAttribute('inert', '');
+      document.body.classList.add('overflow-hidden');
+      setTimeout(() => {
+        const first = document.querySelector('#attendanceModal [data-action="modal-status"]');
+        if (first) first.focus();
+      }, 80);
+    }
+
+    function closeAttendanceModal(force = false) {
+      if (attendanceModalBusy && !force) return;
+      attendanceModalOpen = false;
+      attendanceModalDraftType = null;
+      attendanceModalBusy = false;
+      attendanceModalError = '';
+      const modal = document.getElementById('attendanceModal');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+      const appView = document.getElementById('appView');
+      if (appView) appView.removeAttribute('inert');
+      document.body.classList.remove('overflow-hidden');
+    }
+
+    function maybeShowMandatoryAttendanceModal() {
+      if (!firebaseUser || !currentStudent || !statusSnapshotReady) return;
+      const entry = getStatusEntry(TODAY, currentStudent);
+      if (attendanceModalOpen && entry.type !== 'unregistered') {
+        closeAttendanceModal(true);
+        return;
+      }
+      if (!attendanceModalOpen && entry.type === 'unregistered') {
+        openAttendanceModal();
+      }
+    }
+
+    async function saveMandatoryAttendance(statusKey, period = null) {
+      if (!firebaseUser || !currentStudent || attendanceModalBusy) return;
+      if (!['present', 'absent', 'official', 'late', 'early'].includes(statusKey)) return;
+
+      if (statusKey === 'late' || statusKey === 'early') {
+        if (!period) {
+          attendanceModalDraftType = statusKey;
+          attendanceModalPeriod = statusKey === 'late' ? 2 : 4;
+          renderAttendanceModal();
+          return;
+        }
+        period = Number(period);
+        if (!(period >= 1 && period <= 8)) {
+          attendanceModalError = '時限を1〜8の間で選択してください。';
+          renderAttendanceModal();
+          return;
+        }
+      } else {
+        attendanceModalDraftType = null;
+      }
+
+      attendanceModalBusy = true;
+      attendanceModalError = '';
+      renderAttendanceModal();
+
+      const storedValue = statusKey === 'late' || statusKey === 'early'
+        ? { type: statusKey, period }
+        : statusKey;
+      const studentCode = currentStudent.code;
+      const uid = firebaseUser.uid;
+
+      try {
+        const statusRef = doc(db, 'statuses', TODAY);
+        await runTransaction(db, async (transaction) => {
+          const snap = await transaction.get(statusRef);
+          const existing = snap.exists() && snap.data().statuses && typeof snap.data().statuses === 'object'
+            ? snap.data().statuses
+            : {};
+          transaction.set(statusRef, {
+            date: TODAY,
+            statuses: { ...existing, [studentCode]: storedValue },
+            updatedAt: serverTimestamp(),
+            updatedBy: uid
+          }, { merge: true });
+        });
+
+        if (!statuses[TODAY] || typeof statuses[TODAY] !== 'object') statuses[TODAY] = {};
+        statuses[TODAY][studentCode] = storedValue;
+        rebuildDutyCache();
+        renderAll();
+        closeAttendanceModal(true);
+        showToast('本日の出席状態を登録しました', `${statusLabel(statusKey, period)}`, statusKey === 'present' ? 'success' : 'warning');
+      } catch (err) {
+        console.error(err);
+        attendanceModalBusy = false;
+        attendanceModalError = 'Firestore への保存に失敗しました。接続またはセキュリティルールを確認して、もう一度選択してください。';
+        renderAttendanceModal();
+      }
     }
 
     /* ============================================================
@@ -2295,6 +2465,17 @@
       if (trigger) {
         switch (trigger.dataset.action) {
           case 'auth-tab': switchAuthTab(trigger.dataset.tab); break;
+          case 'modal-status': saveMandatoryAttendance(trigger.dataset.status); break;
+          case 'modal-confirm-period': {
+            const select = document.getElementById('modalPeriodSelect');
+            const period = select ? Number(select.value) : attendanceModalPeriod;
+            saveMandatoryAttendance(attendanceModalDraftType, period);
+            break;
+          }
+          case 'modal-cancel-period':
+            attendanceModalDraftType = null;
+            renderAttendanceModal();
+            break;
           case 'set-status': setMyStatus(trigger.dataset.status); break;
           case 'confirm-period-status': {
             const select = document.getElementById('periodSelect');
@@ -2326,6 +2507,28 @@
     });
 
     document.addEventListener('keydown', (event) => {
+      if (attendanceModalOpen) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          return;
+        }
+        if (event.key === 'Tab') {
+          const modal = document.getElementById('attendanceModal');
+          const focusables = Array.from(modal.querySelectorAll('button:not([disabled]), select:not([disabled])'))
+            .filter((el) => el.offsetParent !== null);
+          if (!focusables.length) return;
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+        return;
+      }
       if (event.key === 'Escape' && userMenuOpen) {
         userMenuOpen = false;
         renderUserMenu();
@@ -2418,6 +2621,7 @@
         cloudState = 'idle';
         cloudError = '';
         Object.keys(notified).forEach((key) => delete notified[key]);
+        closeAttendanceModal(true);
         applyAuthUI();
         renderCloudStatus();
         return;

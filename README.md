@@ -17,6 +17,11 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
 - 2-month (60-day) availability calendar with Japanese national holidays fetched from `holidays-jp.github.io`.
 - Personal statuses: 未登録 (default), 出席 (Present), 欠席 (Absent), 公欠 (Official Absence), 遅刻 (Late Arrival), 早退 (Early Leave).
 - Late/early statuses require a class-period selection.
+- Mandatory daily attendance modal on sign-in:
+  - Opens immediately for students whose status for today is still 未登録.
+  - Cannot be dismissed without selecting 出席 / 欠席 / 公欠 / 遅刻 / 早退.
+  - Saves the selection to today's Firestore status record, then re-renders the rotation and dashboard.
+  - Students who already submitted today's status skip the modal and go straight to the dashboard.
 - Live class tracker banner based on the current device clock and the weekly timetable.
 - Weekdays only:
   - Saturdays/Sundays and Japanese national holidays are displayed as **休日 / 祝日**.
@@ -83,7 +88,7 @@ For production, tighten the rules further to verify the exact 10 whitelisted ema
 ## Firestore data model
 
 - `config/rotation` — rotation anchor date and initial index.
-- `statuses/{YYYY-MM-DD}` — map of student code → `present | absent | official`.
+- `statuses/{YYYY-MM-DD}` — map of student code → `present | absent | official`, or `{ type: 'late' | 'early', period: 1-8 }`.
 
 ## Notifications
 

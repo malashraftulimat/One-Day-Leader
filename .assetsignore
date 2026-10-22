@@ -1,0 +1,3 @@
+# Upload only the public site entry point.
+*
+!index.html
