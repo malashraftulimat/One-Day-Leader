@@ -13,6 +13,7 @@ A single-file Firebase application for managing a 10-student daily "One Day Lead
 
 - Firebase Auth uses explicit `browserSessionPersistence`: reloads in the same tab stay signed in, while new visits start at Sign In.
 - Anti-cache meta tags and an `APP_VERSION` auto-reload check keep deployed clients current.
+- Dark theme is enabled by default, with a persisted light/dark toggle on the auth screen and in the app header.
 
 - 2-month (60-day) availability calendar with Japanese national holidays fetched from `holidays-jp.github.io`.
 - Personal statuses: 未登録 (default), 出席 (Present), 欠席 (Absent), 公欠 (Official Absence), 遅刻 (Late Arrival), 早退 (Early Leave).
