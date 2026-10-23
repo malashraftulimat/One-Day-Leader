@@ -534,7 +534,7 @@
       setPersistence, browserSessionPersistence
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
     import {
-      getFirestore, collection, doc, query, where,
+      initializeFirestore, collection, doc, query, where,
       onSnapshot, getDoc, getDocs, setDoc, runTransaction, serverTimestamp, writeBatch
     } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 
@@ -682,7 +682,9 @@
 
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
-    const db = getFirestore(firebaseApp);
+    const db = initializeFirestore(firebaseApp, {
+      experimentalForceLongPolling: true
+    });
 
     // Session persistence keeps this tab signed in across reloads; new visits start at Sign In.
     setPersistence(auth, browserSessionPersistence).catch((err) => {
